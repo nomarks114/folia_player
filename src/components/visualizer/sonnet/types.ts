@@ -12,11 +12,17 @@ export type SonnetShotKind =
     | 'tracking-ribbon'
     | 'mask-reveal'
     | 'poster-blocks'
-    | 'quiet-tableau';
+    | 'quiet-tableau'
+    | 'cascade-drop'
+    | 'split-panel';
 export const SONNET_TRANSITION_KINDS = [
     'fast-blur',
     'mono-glitch',
     'camera-pull',
+    'zoom-dip',
+    'slide-sweep',
+    'shutter-slice',
+    'dissolve-fade',
 ] as const;
 export type SonnetTransitionKind = typeof SONNET_TRANSITION_KINDS[number];
 

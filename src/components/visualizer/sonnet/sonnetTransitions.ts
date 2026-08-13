@@ -74,6 +74,66 @@ export const resolveSonnetTransitionEffectFrame = (
         };
     }
 
+    if (kind === 'zoom-dip') {
+        // Quick camera push: scale up with a slight rotation nudge, then settle.
+        const direction = seed > 0.5 ? 1 : -1;
+        return {
+            x: 0,
+            y: 0,
+            scale: 1 + amount * 0.08,
+            rotation: direction * amount * 0.02,
+            alpha: phase === 'exit' ? 1 - amount * 0.9 : 1 - amount * 0.6,
+            blur: amount * 2,
+            glitch: 0,
+            glitchSeed: 0,
+        };
+    }
+
+    if (kind === 'slide-sweep') {
+        // Horizontal page-sweep with directional blur.
+        const direction = seed > 0.5 ? 1 : -1;
+        return {
+            x: direction * amount * 0.06,
+            y: 0,
+            scale: 1,
+            rotation: 0,
+            alpha: phase === 'exit' ? 1 - amount * 0.85 : 1 - amount * 0.5,
+            blur: amount * 5,
+            glitch: 0,
+            glitchSeed: 0,
+        };
+    }
+
+    if (kind === 'shutter-slice') {
+        // Vertical film-strip slide with subtle scale contraction.
+        const direction = seed > 0.5 ? 1 : -1;
+        return {
+            x: 0,
+            y: direction * amount * 0.04,
+            scale: 1 - amount * 0.03,
+            rotation: 0,
+            alpha: phase === 'exit' ? 1 - amount * 0.88 : 1 - amount * 0.55,
+            blur: amount * 1.5,
+            glitch: 0,
+            glitchSeed: 0,
+        };
+    }
+
+    if (kind === 'dissolve-fade') {
+        // Gentle cross-dissolve with subtle scale breathing and light blur.
+        return {
+            x: 0,
+            y: 0,
+            scale: 1 + amount * 0.025,
+            rotation: 0,
+            alpha: phase === 'exit' ? 1 - amount : 1 - amount * 0.7,
+            blur: amount * 3,
+            glitch: 0,
+            glitchSeed: 0,
+        };
+    }
+
+    // camera-pull fallback
     return {
         x: 0,
         y: 0,

@@ -196,6 +196,9 @@ export const resolveShotMotionFrame = (
 ): SonnetShotMotionFrame => {
     const linear = clamp01(progress);
     const eased = resolveShotPathProgress(kind, linear);
+    // Fragment-collage overview lift: smooth zoom-out in the last 30% of the shot
+    const liftRaw = Math.max(0, (linear - 0.7) / 0.3);
+    const liftSmooth = liftRaw * liftRaw * (3 - 2 * liftRaw);
     const frames: Record<SonnetShotKind, SonnetShotMotionFrame> = {
         'editorial-column': {
             x: -0.055 + eased * 0.095,
@@ -210,10 +213,10 @@ export const resolveShotMotionFrame = (
             rotation: -0.01 + eased * 0.016,
         },
         'fragment-collage': {
-            x: -0.045 + eased * 0.085,
-            y: 0.028 - Math.sin(eased * Math.PI) * 0.055,
-            scale: 0.97 + eased * 0.09,
-            rotation: -0.014 + eased * 0.028,
+            x: (-0.045 + eased * 0.085) * (1 - liftSmooth * 0.7),
+            y: 0.028 - Math.sin(eased * Math.PI) * 0.055 - liftSmooth * 0.07,
+            scale: 0.97 + eased * 0.09 - liftSmooth * 0.2,
+            rotation: (-0.014 + eased * 0.028) * (1 - liftSmooth * 0.8),
         },
         'tracking-ribbon': {
             x: -0.16 + eased * 0.28,
@@ -238,6 +241,18 @@ export const resolveShotMotionFrame = (
             y: 0.014 - eased * 0.025,
             scale: 1 + eased * 0.028,
             rotation: -0.002 + eased * 0.003,
+        },
+        'cascade-drop': {
+            x: 0.01 - eased * 0.02,
+            y: 0.08 - eased * 0.12,
+            scale: 0.96 + eased * 0.1,
+            rotation: -0.008 + eased * 0.014,
+        },
+        'split-panel': {
+            x: 0,
+            y: 0.005 - eased * 0.01,
+            scale: 0.99 + eased * 0.03,
+            rotation: 0,
         },
     };
     return frames[kind];

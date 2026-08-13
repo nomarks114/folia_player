@@ -15,10 +15,12 @@ import {
 } from './sonnetTypographyRoles';
 import { layoutSonnetPosterBlocks } from './sonnetPosterBlocksLayout';
 import {
+    layoutCascadeDrop,
     layoutCrossStack,
     layoutEditorialColumn,
     layoutFragmentCollage,
     layoutQuietTableau,
+    layoutSplitPanel,
     layoutTrackingRibbon,
     resolveSonnetFlowGaps,
 } from './sonnetShotFlowLayouts';
@@ -53,6 +55,7 @@ export interface SonnetTypographyPlacement {
     vertical: boolean;
     layoutDirection: 'horizontal' | 'vertical';
     timingPhase: number;
+    entryDelay?: number;
 }
 
 interface SonnetTypographyLayoutOptions {
@@ -210,6 +213,15 @@ export const resolveSonnetTypographyLayout = ({
                 supportFontScale = 1.15;
                 vertical = isEmphasized && (tableauVariant === 0 || tableauVariant === 1);
                 break;
+            case 'cascade-drop':
+                heroFontScale = 3.8;
+                supportFontScale = 1.3;
+                vertical = isEmphasized;
+                break;
+            case 'split-panel':
+                heroFontScale = 3.6;
+                supportFontScale = 1.25;
+                break;
         }
 
         let fontScale = isHero
@@ -226,13 +238,22 @@ export const resolveSonnetTypographyLayout = ({
             rotation += Math.PI / 2;
         }
 
+        // Allow up to ±5° of deterministic tilt for visual dynamism.
+        // Skip for poster-blocks (rigid grid) and mask-reveal (masked precision).
+        if (shotKind !== 'poster-blocks' && shotKind !== 'mask-reveal') {
+            const tiltSeed = hashSonnetSeed(segment.text + index);
+            rotation += ((tiltSeed % 1001) / 1000 - 0.5) * 2 * (5 * Math.PI / 180);
+        }
+
         // To prevent massive text from overflowing 82% of screen width, we calculate a fitScale
         const displayText = vertical ? verticalText(segment) : segment.text;
         const renderRole: SonnetSegmentRole = isHero ? 'hero' : isSemiHero ? 'semi-hero' : 'support';
         const renderWeight = resolveSonnetRoleFontWeight(fontWeight, renderRole);
+        // Vertical text uses lighter weight to avoid visual heaviness
+        const finalWeight = vertical ? Math.max(300, renderWeight - 200) : renderWeight;
 
         let targetFontSize = baseFontSize * fontScale;
-        const fontSpec = `${renderWeight} ${targetFontSize}px ${fontFamily}`;
+        const fontSpec = `${finalWeight} ${targetFontSize}px ${fontFamily}`;
 
         const horizontalAdvance = rotatesNonCjkSegment
             ? segment.graphemes.reduce((sum, item) => (
@@ -325,7 +346,8 @@ export const resolveSonnetTypographyLayout = ({
             x: 0,
             y: 0,
             enterX: 0,
-            enterY: 0
+            enterY: 0,
+            entryDelay: 0,
         };
     });
 
@@ -342,11 +364,18 @@ export const resolveSonnetTypographyLayout = ({
             else if (shotKind === 'tracking-ribbon') layoutTrackingRibbon(flowCtx, ribbonVariant);
             else if (shotKind === 'editorial-column') layoutEditorialColumn(flowCtx, editorialVariant, secondaryHeroIndex);
             else if (shotKind === 'fragment-collage') layoutFragmentCollage(flowCtx, collageVariant);
+            else if (shotKind === 'cascade-drop') layoutCascadeDrop(flowCtx);
+            else if (shotKind === 'split-panel') layoutSplitPanel(flowCtx);
             else layoutCrossStack(flowCtx);
         }
 
-        heroBox.enterX = 0;
-        heroBox.enterY = height * 0.15;
+        // New shot kinds set their own hero entry direction and delay in the layout
+        // functions (supports appear first, hero appears last as climax).
+        const newShotKinds = ['cascade-drop', 'split-panel', 'fragment-collage'];
+        if (!newShotKinds.includes(shotKind)) {
+            heroBox.enterX = 0;
+            heroBox.enterY = height * 0.15;
+        }
 
         const decorations: typeof boxes = [];
         if (shotKind !== 'quiet-tableau' && shotKind !== 'poster-blocks') {
@@ -400,5 +429,6 @@ export const resolveSonnetTypographyLayout = ({
         vertical: box.vertical,
         layoutDirection: box.layoutDirection,
         timingPhase: box.timingPhase,
+        entryDelay: box.entryDelay,
     }));
 };

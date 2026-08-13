@@ -170,7 +170,7 @@ export const buildSonnetScene = (
             .filter(segs => segs.length > 0);
         const segments = linesSegments.flat();
         const wordCount = Math.max(1, segments.filter(segment => segment.isWordLike).length);
-        const heroScale = shot.kind === 'type-impact' ? 1.55 : shot.kind === 'quiet-tableau' ? 0.82 : 1;
+        const heroScale = shot.kind === 'type-impact' ? 1.55 : shot.kind === 'quiet-tableau' ? 0.82 : shot.kind === 'cascade-drop' ? 1.2 : 1;
         const fontSize = Math.max(24, Math.min(112, (
             width / Math.max(7, wordCount * 2.15)
         ) * heroScale * options.lyricsFontScale));
@@ -274,18 +274,19 @@ export const buildSonnetScene = (
         });
         
         // Poster blocks start centered before runtime tracking; other templates start on the hero word.
+        // Split-panel centers the camera to keep both left/right panels visible.
         const heroPlacement = placements.find(p => p.role === 'hero');
-        const focusX = shot.kind === 'poster-blocks'
+        const focusX = shot.kind === 'poster-blocks' || shot.kind === 'split-panel'
             ? 0
             : heroPlacement ? heroPlacement.x : (bounds.x + bounds.width / 2);
-        const focusY = shot.kind === 'poster-blocks'
+        const focusY = shot.kind === 'poster-blocks' || shot.kind === 'split-panel'
             ? 0
             : heroPlacement ? heroPlacement.y : (bounds.y + bounds.height / 2);
         
         shotContainer.pivot.set(focusX, focusY);
         shotContainer.position.set(
-            width * (shot.kind === 'poster-blocks' ? 0.5 : 0.5 + shot.camera.x),
-            height * (shot.kind === 'poster-blocks'
+            width * (shot.kind === 'poster-blocks' || shot.kind === 'split-panel' ? 0.5 : 0.5 + shot.camera.x),
+            height * (shot.kind === 'poster-blocks' || shot.kind === 'split-panel'
                 ? 0.5
                 : 0.48 + shot.camera.y + (shotIndex % 2 ? 0.025 : -0.025)),
         );

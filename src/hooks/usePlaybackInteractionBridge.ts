@@ -167,7 +167,7 @@ export function usePlaybackInteractionBridge({
                 document.querySelector('[data-folia-keyboard-window="true"]')
             );
 
-            if (isDev && event.altKey && event.shiftKey && event.code === 'KeyD') {
+            if (isDev && event.ctrlKey && event.shiftKey && event.code === 'KeyD') {
                 event.preventDefault();
                 setIsDevDebugOverlayVisible(prev => !prev);
                 return;

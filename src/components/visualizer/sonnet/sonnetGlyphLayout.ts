@@ -61,7 +61,8 @@ export const buildSonnetGlyphLayout = (
         const cosine = Math.cos(placement.rotation);
         const sine = Math.sin(placement.rotation);
         const stagger = index % 2 === 0 ? -1 : 1;
-        const startTime = grapheme.startTime;
+        const entryDelay = placement.entryDelay ?? 0;
+        const startTime = grapheme.startTime + entryDelay;
         const settleTime = startTime + motionDuration;
         return {
             char: grapheme.char,

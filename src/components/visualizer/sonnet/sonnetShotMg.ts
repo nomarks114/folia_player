@@ -692,6 +692,51 @@ export const buildSonnetShotMg = (
             bg.moveTo(-hw, y).lineTo(hw, y).stroke({ color: primary, width: 1, alpha: 0.15 });
         }
         bg.rect(-hw + width * 0.2, -hh + height * 0.2, width * 0.6, height * 0.6).stroke({ color: primary, width: 4, alpha: 0.5 });
+    } else if (kind === 'cascade-drop') {
+        // Waterfall cascade: staggered vertical lines with gentle horizontal drift
+        for (let i = 0; i < 7; i++) {
+            const x = -hw + width * (0.12 + i * 0.12);
+            const drift = ((seed + i * 31) % 40 - 20) * 0.4;
+            bg.moveTo(x + drift, -hh).lineTo(x + drift * 0.6, hh)
+                .stroke({ color: i % 2 ? secondary : primary, width: 1, alpha: 0.08 + (i % 3) * 0.03 });
+        }
+        // Horizontal catch bars at staggered heights
+        for (let i = 0; i < 4; i++) {
+            const y = -hh + height * (0.25 + i * 0.18);
+            const barWidth = width * (0.15 + ((seed + i * 17) % 30) / 100);
+            const barX = -hw + width * (0.1 + ((seed + i * 23) % 50) / 100);
+            bg.moveTo(barX, y).lineTo(barX + barWidth, y)
+                .stroke({ color: secondary, width: 1, alpha: 0.12 });
+        }
+    } else if (kind === 'split-panel') {
+        // Divided screen: bold central axis with subtle zone markers
+        bg.moveTo(0, -hh).lineTo(0, hh)
+            .stroke({ color: primary, width: 2, alpha: 0.35 });
+        // Thin secondary divider dashes
+        for (let i = 0; i < 6; i++) {
+            const y = -hh + height * ((i + 1) / 7);
+            const dashLen = width * 0.04;
+            bg.moveTo(-dashLen, y).lineTo(dashLen, y)
+                .stroke({ color: secondary, width: 1, alpha: 0.18 });
+        }
+        // Corner brackets marking left/right zones
+        const bracket = 18;
+        bg.moveTo(-hw + 8, -hh + 8).lineTo(-hw + 8 + bracket, -hh + 8)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
+        bg.moveTo(-hw + 8, -hh + 8).lineTo(-hw + 8, -hh + 8 + bracket)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
+        bg.moveTo(hw - 8, -hh + 8).lineTo(hw - 8 - bracket, -hh + 8)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
+        bg.moveTo(hw - 8, -hh + 8).lineTo(hw - 8, -hh + 8 + bracket)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
+        bg.moveTo(-hw + 8, hh - 8).lineTo(-hw + 8 + bracket, hh - 8)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
+        bg.moveTo(-hw + 8, hh - 8).lineTo(-hw + 8, hh - 8 - bracket)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
+        bg.moveTo(hw - 8, hh - 8).lineTo(hw - 8 - bracket, hh - 8)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
+        bg.moveTo(hw - 8, hh - 8).lineTo(hw - 8, hh - 8 - bracket)
+            .stroke({ color: primary, width: 1, alpha: 0.25 });
     } else {
         // quiet-tableau or mask-reveal (Minimalistic scattered elements)
         for (let i = 0; i < 5; i++) {

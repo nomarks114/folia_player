@@ -31,6 +31,8 @@ export const SONNET_SHOT_KINDS: readonly SonnetShotKind[] = [
     'mask-reveal',
     'poster-blocks',
     'quiet-tableau',
+    'cascade-drop',
+    'split-panel',
 ];
 // Optional layout-debug override; null keeps every registered template in the random pool.
 export const SONNET_DEBUG_SHOT_KIND: SonnetShotKind | null = null;
@@ -165,14 +167,26 @@ const buildShots = (
         if (debugShotKind === null) {
             if (kind === 'breath' && shotIndex === 0 && wordCount <= 2) shotKind = 'quiet-tableau';
             if (kind === 'chorus' && shotKind === 'quiet-tableau') shotKind = 'type-impact';
+            // Cascade-drop needs at least 3 words for the waterfall effect
+            if (shotKind === 'cascade-drop' && wordCount < 3) shotKind = 'editorial-column';
+            // Split-panel needs at least 2 words for left/right contrast
+            if (shotKind === 'split-panel' && wordCount < 2) shotKind = 'editorial-column';
         }
         lastKind = shotKind;
         const random = hashSonnetSeed(`${seed}:${paragraphIndex}:${shotIndex}:camera`);
         const zoomRandom = ((random >>> 16) & 255) / 255;
         // Medium close-up bias: framing should feel intimate with the current word;
         // only composition-first layouts (poster zones, calm tableau) stay wider.
-        const zoomBase = shotKind === 'poster-blocks' ? 1.02 : shotKind === 'quiet-tableau' ? 1.12 : 1.22;
-        const zoomSpan = shotKind === 'poster-blocks' ? 0.16 : shotKind === 'quiet-tableau' ? 0.2 : 0.26;
+        const zoomBase = shotKind === 'poster-blocks' ? 1.02
+            : shotKind === 'quiet-tableau' ? 1.12
+            : shotKind === 'split-panel' ? 1.06
+            : shotKind === 'cascade-drop' ? 1.14
+            : 1.22;
+        const zoomSpan = shotKind === 'poster-blocks' ? 0.16
+            : shotKind === 'quiet-tableau' ? 0.2
+            : shotKind === 'split-panel' ? 0.12
+            : shotKind === 'cascade-drop' ? 0.22
+            : 0.26;
         return {
             id: `p${paragraphIndex}-s${shotIndex}`,
             kind: shotKind,

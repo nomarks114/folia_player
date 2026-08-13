@@ -20,6 +20,7 @@ export interface SonnetFlowLayoutBox {
     y: number;
     enterX: number;
     enterY: number;
+    entryDelay?: number;
 }
 
 export interface SonnetFlowLayoutContext<T extends SonnetFlowLayoutBox> {
@@ -40,8 +41,9 @@ export const resolveSonnetFlowGaps = (baseFontSize: number) => {
 };
 
 // Runs a placement pass at shrinking global scales until every measured box sits
-// inside the stage safe area. All roles shrink together, so the hero > semi-hero >
-// support hierarchy and the "supports never upscale" rule survive every retry.
+// inside the stage safe area AND no two boxes overlap. All roles shrink together,
+// so the hero > semi-hero > support hierarchy and the "supports never upscale" rule
+// survive every retry.
 export const placeWithGlobalFit = <T extends SonnetFlowLayoutBox>(
     ctx: SonnetFlowLayoutContext<T>,
     place: (globalScale: number) => void,
@@ -51,20 +53,30 @@ export const placeWithGlobalFit = <T extends SonnetFlowLayoutBox>(
         measuredWidth: box.measuredWidth,
         measuredHeight: box.measuredHeight,
     }));
-    const safeHalfW = ctx.width * 0.48;
-    const safeHalfH = ctx.height * 0.46;
-    for (const globalScale of [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52]) {
+    const safeHalfW = ctx.width * 0.44;
+    const safeHalfH = ctx.height * 0.42;
+    const minGap = Math.max(8, ctx.flowGap * 0.5);
+    const boxesOverlap = (a: T, b: T) => {
+        const dx = Math.abs(a.x - b.x);
+        const dy = Math.abs(a.y - b.y);
+        return dx < (a.measuredWidth + b.measuredWidth) / 2 + minGap
+            && dy < (a.measuredHeight + b.measuredHeight) / 2 + minGap;
+    };
+    for (const globalScale of [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44]) {
         ctx.boxes.forEach((box, index) => {
             box.fontScale = snapshot[index].fontScale * globalScale;
             box.measuredWidth = snapshot[index].measuredWidth * globalScale;
             box.measuredHeight = snapshot[index].measuredHeight * globalScale;
         });
         place(globalScale);
-        const fits = ctx.boxes.every(box => (
+        const inBounds = ctx.boxes.every(box => (
             Math.abs(box.x) + box.measuredWidth / 2 <= safeHalfW + 0.5
             && Math.abs(box.y) + box.measuredHeight / 2 <= safeHalfH + 0.5
         ));
-        if (fits) return;
+        const hasOverlap = ctx.boxes.some((a, i) =>
+            ctx.boxes.some((b, j) => j > i && boxesOverlap(a, b)),
+        );
+        if (inBounds && !hasOverlap) return;
     }
 };
 
@@ -396,6 +408,10 @@ export const layoutFragmentCollage = <T extends SonnetFlowLayoutBox>(
         }
         box.rotation = 0;
     });
+    // Hero appears last as the centrepiece; supports orbit in first.
+    heroBox.enterX = 0;
+    heroBox.enterY = 0;
+    heroBox.entryDelay = 0.4;
     placeWithGlobalFit(ctx, (globalScale) => {
         heroBox.x = 0;
         heroBox.y = 0;
@@ -432,21 +448,49 @@ export const layoutFragmentCollage = <T extends SonnetFlowLayoutBox>(
             // box onto an occupied spot.
             let resolvedRadius = radius;
             let placedClear = false;
-            for (let ring = 0; ring < 14 && !placedClear; ring += 1) {
-                for (let attempt = 0; attempt < 400; attempt++) {
+            // Track the candidate with the best (largest) minimum separation so
+            // that even a failed sweep still places the box at the least-bad spot.
+            let bestCandidate = candidate;
+            let bestRect: PlacedRect = { left: 0, right: 0, top: 0, bottom: 0 };
+            let bestMinSep = -Infinity;
+            let bestRadius = resolvedRadius;
+            for (let ring = 0; ring < 20 && !placedClear; ring += 1) {
+                for (let attempt = 0; attempt < 600; attempt++) {
                     rect = {
                         left: Math.cos(candidate) * resolvedRadius - box.measuredWidth / 2,
                         right: Math.cos(candidate) * resolvedRadius + box.measuredWidth / 2,
                         top: Math.sin(candidate) * resolvedRadius * squash - box.measuredHeight / 2,
                         bottom: Math.sin(candidate) * resolvedRadius * squash + box.measuredHeight / 2,
                     };
-                    if (placed.every(entry => rectSeparation(entry, rect) >= flowGap)) {
+                    const minSep = Math.min(...placed.map(entry => rectSeparation(entry, rect)));
+                    if (minSep >= flowGap) {
                         placedClear = true;
                         break;
                     }
+                    if (minSep > bestMinSep) {
+                        bestMinSep = minSep;
+                        bestCandidate = candidate;
+                        bestRect = rect;
+                        bestRadius = resolvedRadius;
+                    }
                     candidate += 0.07;
                 }
-                if (!placedClear) resolvedRadius += (36 + ring * 12) * globalScale;
+                if (!placedClear) resolvedRadius += (36 + ring * 14) * globalScale;
+            }
+            if (!placedClear) {
+                // Sweep exhausted — push the box outward to a radius that clears
+                // every placed rect so we never place on top of another box.
+                const maxExtent = placed.reduce((max, entry) =>
+                    Math.max(max, Math.abs(entry.left), Math.abs(entry.right),
+                             Math.abs(entry.top), Math.abs(entry.bottom)), 0);
+                resolvedRadius = maxExtent + box.measuredWidth / 2 + box.measuredHeight / 2 + flowGap * 2;
+                candidate = angle + (Math.PI * 2 * supportIndex) / count;
+                rect = {
+                    left: Math.cos(candidate) * resolvedRadius - box.measuredWidth / 2,
+                    right: Math.cos(candidate) * resolvedRadius + box.measuredWidth / 2,
+                    top: Math.sin(candidate) * resolvedRadius * squash - box.measuredHeight / 2,
+                    bottom: Math.sin(candidate) * resolvedRadius * squash + box.measuredHeight / 2,
+                };
             }
             angle = candidate + 0.02;
             placed.push(rect);
@@ -555,3 +599,107 @@ export const layoutCrossStack = <T extends SonnetFlowLayoutBox>(
         }
     });
 };
+
+// Cascade-drop: words cascade from above in a staggered waterfall pattern.
+// Hero sits center-upper, support words drop down in timeline order with
+// increasing horizontal offset, creating a diagonal cascade.
+// Support words appear first; hero drops in last as the climax.
+export const layoutCascadeDrop = <T extends SonnetFlowLayoutBox>(
+    ctx: SonnetFlowLayoutContext<T>,
+) => {
+    const { boxes, heroIndex, width, height, flowGap, stackGap } = ctx;
+    placeWithGlobalFit(ctx, () => {
+        const heroBox = boxes[heroIndex];
+        heroBox.x = 0;
+        heroBox.y = -height * 0.06;
+        // Hero drops in from above, appears last
+        heroBox.enterX = 0;
+        heroBox.enterY = -height * 0.22;
+        heroBox.entryDelay = 0.45;
+
+        // Maximum horizontal spread — keeps cascade within safe area
+        const maxSpreadX = width * 0.32;
+        // Compact horizontal step based on gap, not measuredWidth
+        const hStep = flowGap * 1.4;
+
+        // Words before hero: cascade upward-left
+        let currentY = heroBox.y - heroBox.measuredHeight / 2 - stackGap;
+        for (let i = heroIndex - 1; i >= 0; i--) {
+            const box = boxes[i];
+            const dist = heroIndex - i;
+            const offset = Math.min(dist * hStep, maxSpreadX);
+            box.layoutDirection = 'vertical';
+            box.x = -offset + (i % 2 === 0 ? -6 : 6);
+            box.y = currentY - box.measuredHeight / 2;
+            currentY -= box.measuredHeight + stackGap * 0.7;
+            box.enterX = -20; box.enterY = -40;
+            box.entryDelay = 0;
+        }
+
+        // Words after hero: cascade downward-right
+        currentY = heroBox.y + heroBox.measuredHeight / 2 + stackGap;
+        for (let i = heroIndex + 1; i < boxes.length; i++) {
+            const box = boxes[i];
+            const dist = i - heroIndex;
+            const offset = Math.min(dist * hStep, maxSpreadX);
+            box.layoutDirection = 'vertical';
+            box.x = offset + (i % 2 === 0 ? 6 : -6);
+            box.y = currentY + box.measuredHeight / 2;
+            currentY += box.measuredHeight + stackGap * 0.7;
+            box.enterX = 20; box.enterY = 40;
+            box.entryDelay = 0;
+        }
+    });
+};
+
+// Split-panel: divides the screen into left and right halves.
+// Hero and earlier words on the left, later words on the right.
+// Support words appear first on both sides; hero slides in last.
+export const layoutSplitPanel = <T extends SonnetFlowLayoutBox>(
+    ctx: SonnetFlowLayoutContext<T>,
+) => {
+    const { boxes, heroIndex, width, height, flowGap, stackGap } = ctx;
+    placeWithGlobalFit(ctx, () => {
+        const heroBox = boxes[heroIndex];
+        // Position hero in the left panel, offset by its own half-width
+        const leftCenterX = -(heroBox.measuredWidth / 2 + flowGap * 2);
+        heroBox.x = leftCenterX;
+        heroBox.y = 0;
+        // Hero slides in from the left, appears last
+        heroBox.enterX = -width * 0.12;
+        heroBox.enterY = 0;
+        heroBox.entryDelay = 0.4;
+
+        // Left panel: words before hero, stacked above
+        let leftY = heroBox.y - heroBox.measuredHeight / 2 - stackGap;
+        for (let i = heroIndex - 1; i >= 0; i--) {
+            const box = boxes[i];
+            box.layoutDirection = 'horizontal';
+            box.x = leftCenterX + (i % 2 === 0 ? -10 : 10);
+            box.y = leftY - box.measuredHeight / 2;
+            leftY -= box.measuredHeight + stackGap;
+            box.enterX = -25; box.enterY = 0;
+            box.entryDelay = 0;
+        }
+
+        // Right panel: words after hero, stacked vertically
+        const leftMaxHalf = Math.max(heroBox.measuredWidth / 2,
+            ...boxes.slice(0, heroIndex).map(b => b.measuredWidth / 2));
+        const rightCenterX = leftMaxHalf + flowGap * 3;
+        let rightY = -height * 0.2;
+        for (let i = heroIndex + 1; i < boxes.length; i++) {
+            const box = boxes[i];
+            box.layoutDirection = 'horizontal';
+            box.x = rightCenterX + (i % 2 === 0 ? 10 : -10);
+            box.y = rightY + box.measuredHeight / 2;
+            rightY += box.measuredHeight + stackGap;
+            box.enterX = 25; box.enterY = 0;
+            box.entryDelay = 0;
+        }
+    });
+};
+
+// Float-drift: words float freely with gentle organic offsets.
+// Hero stays near center, support words drift with a golden-ratio
+// spiral distribution. Supports drift in first; hero fades in last.
+
