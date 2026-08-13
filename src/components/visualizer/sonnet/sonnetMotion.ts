@@ -258,6 +258,17 @@ export const resolveShotMotionFrame = (
     return frames[kind];
 };
 
+// Computes the camera pan direction at the end of a shot by evaluating the
+// motion derivative near progress = 1.  Positive x → panning right, negative
+// x → panning left.  Positive y → panning down, negative y → panning up.
+export const resolveShotPanDirection = (kind: SonnetShotKind): { x: number; y: number } => {
+    const p1 = 0.97;
+    const p2 = 1.0;
+    const f1 = resolveShotMotionFrame(kind, p1);
+    const f2 = resolveShotMotionFrame(kind, p2);
+    return { x: f2.x - f1.x, y: f2.y - f1.y };
+};
+
 export const SONNET_CAMERA_BREATH_MAX_OFFSET = 0.006;
 export const SONNET_CAMERA_BREATH_MAX_SCALE = 0.002;
 export const SONNET_CAMERA_BREATH_MAX_ROTATION = 0.0015;

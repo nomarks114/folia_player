@@ -4,7 +4,7 @@ import {
     type SonnetShot,
     type SonnetTransitionKind,
 } from './types';
-import { clamp01, easeSonnetInOut } from './sonnetMotion';
+import { clamp01, easeSonnetInOut, resolveShotPanDirection } from './sonnetMotion';
 
 // src/components/visualizer/sonnet/sonnetTransitions.ts
 // Resolves fast, seek-stable monochrome scene transitions without chromatic dispersion.
@@ -40,6 +40,7 @@ export const resolveSonnetTransitionEffectFrame = (
     phase: 'enter' | 'exit',
     progress: number,
     seed: number,
+    panDirection?: { x: number; y: number } | null,
 ): SonnetSceneTransitionFrame => {
     const linear = clamp01(progress);
     const eased = easeSonnetInOut(linear);
@@ -76,7 +77,10 @@ export const resolveSonnetTransitionEffectFrame = (
 
     if (kind === 'zoom-dip') {
         // Quick camera push: scale up with a slight rotation nudge, then settle.
-        const direction = seed > 0.5 ? 1 : -1;
+        // Exit: rotation direction follows horizontal pan; Enter: seed-based.
+        const direction = (phase === 'exit' && panDirection)
+            ? (panDirection.x >= 0 ? 1 : -1)
+            : (seed > 0.5 ? 1 : -1);
         return {
             x: 0,
             y: 0,
@@ -91,7 +95,10 @@ export const resolveSonnetTransitionEffectFrame = (
 
     if (kind === 'slide-sweep') {
         // Horizontal page-sweep with directional blur.
-        const direction = seed > 0.5 ? 1 : -1;
+        // Exit: sweep follows horizontal pan direction; Enter: seed-based.
+        const direction = (phase === 'exit' && panDirection)
+            ? (panDirection.x >= 0 ? 1 : -1)
+            : (seed > 0.5 ? 1 : -1);
         return {
             x: direction * amount * 0.06,
             y: 0,
@@ -106,7 +113,10 @@ export const resolveSonnetTransitionEffectFrame = (
 
     if (kind === 'shutter-slice') {
         // Vertical film-strip slide with subtle scale contraction.
-        const direction = seed > 0.5 ? 1 : -1;
+        // Exit: slice follows vertical pan direction; Enter: seed-based.
+        const direction = (phase === 'exit' && panDirection)
+            ? (panDirection.y >= 0 ? 1 : -1)
+            : (seed > 0.5 ? 1 : -1);
         return {
             x: 0,
             y: direction * amount * 0.04,
@@ -156,7 +166,11 @@ export const resolveSonnetExitTransitionFrame = (
     const transition = paragraph.transitionOut;
     if (!enabled || !transition || time < transition.startTime) return IDLE_SONNET_TRANSITION_FRAME;
     const progress = (time - transition.startTime) / Math.max(transition.endTime - transition.startTime, 0.001);
-    return resolveSonnetTransitionEffectFrame(transition.kind, 'exit', progress, seed);
+    // Derive pan direction from the paragraph's last shot so the exit
+    // transition sweeps in the same direction the camera was panning.
+    const lastShot = paragraph.shots[paragraph.shots.length - 1];
+    const panDirection = lastShot ? resolveShotPanDirection(lastShot.kind) : null;
+    return resolveSonnetTransitionEffectFrame(transition.kind, 'exit', progress, seed, panDirection);
 };
 
 export const resolveSonnetEnterTransitionFrame = (
@@ -203,10 +217,13 @@ export const resolveSonnetShotTransitionFrame = (
     const duration = Math.min(0.24, Math.max(0.14, (next.startTime - current.startTime) * 0.18));
     const transitionStart = next.startTime - duration;
     if (time < transitionStart) return IDLE_SONNET_TRANSITION_FRAME;
+    // Exit direction follows the current shot's camera pan — "摇到哪切到哪".
+    const exitPanDirection = resolveShotPanDirection(current.kind);
     return resolveSonnetTransitionEffectFrame(
         resolveBoundaryKind(seed, activeShotIndex),
         'exit',
         (time - transitionStart) / duration,
         seed + (activeShotIndex + 1) * 97,
+        exitPanDirection,
     );
 };
