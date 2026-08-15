@@ -496,6 +496,10 @@ declare global {
       removeCoverCache: (cacheKey: string) => Promise<boolean>;
       getCoverCacheUsage: () => Promise<number>;
       clearCoverCache: () => Promise<boolean>;
+      hasLocalCoverAsset: (assetId: string) => Promise<boolean>;
+      saveLocalCoverAsset: (assetId: string, data: ArrayBuffer, mimeType: string) => Promise<boolean>;
+      removeLocalCoverAsset: (assetId: string) => Promise<boolean>;
+      clearLocalCoverAssets: () => Promise<boolean>;
       generateTheme: (lyricsText: string, options?: { isPureMusic?: boolean; songTitle?: string }) => Promise<any>;
       fetchLyricProxy: (
         url: string,
@@ -549,7 +553,7 @@ declare global {
       publishObsBrowserSourceAudio: (audio: ElectronObsBrowserSourceAudio) => Promise<boolean>;
       getLyricApiStatus: () => Promise<import('./types/lyricApi').LyricApiStatus>;
       setLyricApiEnabled: (enabled: boolean) => Promise<import('./types/lyricApi').LyricApiStatus>;
-      publishLyricApiData: (lyrics: import('./types').LyricData | null) => Promise<boolean>;
+      publishLyricApiData: (lyrics: import('./types').LyricData | null, offset: number) => Promise<boolean>;
       onLyricApiStatusChanged: (callback: (status: import('./types/lyricApi').LyricApiStatus) => void) => () => void;
       getDiscordPresenceStatus: () => Promise<ElectronDiscordPresenceStatus>;
       publishDiscordPresenceSnapshot: (snapshot: ElectronDiscordPresenceSnapshot) => Promise<ElectronDiscordPresenceStatus>;

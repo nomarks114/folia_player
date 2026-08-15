@@ -35,6 +35,20 @@ yay -S folia-major-bin
 
 `tar.gz` 包中附带图标与 `.desktop` 模板，可按需手动创建桌面启动项。
 
+### Quickshell 歌词插件
+
+对于 omarchy 4 / quickshell 用户，我们提供一个简单的顶部歌词插件：[lia.lines](https://github.com/chthollyphile/lia.lines)
+
+omarchy 用户可从下列官方插件市场链接获取：
+
+https://omarchyplugins.com/plugin.html?id=lia.folia-lyrics
+
+可连接 folia-v1-lyric 接口，在顶部状态栏查看歌词，以及进行暂停/播放操作。该插件在folia没有播放的时候也支持作为简易MPRIS组件，显示媒体信息
+
+<img width="2560" height="51" alt="image" src="https://github.com/user-attachments/assets/87cb8db0-ef00-4382-9eb3-fa7696e4f6ff" />
+
+
+
 ### Hyprland / Wayland 遥控窗
 
 桌面端的外部遥控窗会作为主窗口的伴随窗口打开，并使用稳定窗口标题 `Folia Remote`。在 Hyprland 下，如果希望它以悬浮小窗方式出现，可以在 `hyprland.conf` 中添加类似规则：
@@ -90,7 +104,7 @@ Electron 桌面端可在“连接与集成”中启用歌词接口。启用后�
 GET http://127.0.0.1:32109/v1/lyric
 ```
 
-接口返回当前歌词的精简 JSON；当前没有歌词时返回 `null`。请求、响应结构、字段说明和调用示例见 [歌词接口文档](lyric-api.md)。
+接口返回当前歌词的精简 JSON，并在顶层 `offset` 字段中携带用户设置的歌词时间偏移（毫秒）；当前没有歌词时返回 `null`。请求、响应结构、字段说明和调用示例见 [歌词接口文档](lyric-api.md)。
 
 ### 一键部署到 Vercel
 

@@ -204,6 +204,7 @@ export default {
     "runPinnedCommand": "Run pinned command: {{command}}",
     "empty": "No matching command",
     "syncNotConfigured": "Sync is not enabled. Configure and enable it in Storage settings first.",
+    "obsCssNoAsset": "No uploaded OBS assets are in use. Upload a custom background, portrait, emoji, or avatar first.",
     "run": "Run",
     "recognized": "Recognized",
     "previewSearch": "Search {{source}} songs: {{query}}",
@@ -242,6 +243,7 @@ export default {
       "settings-discord-presence": { "title": "Discord playback status", "description": "Open Discord Rich Presence settings" },
       "settings-obs-browser-source": { "title": "OBS browser source", "description": "Open OBS browser source settings" },
       "desktop-toggle-lyric-api": { "title": "Lyrics API", "description": "Toggle the local unauthenticated lyrics endpoint" },
+      "settings-obs-copy-css": { "title": "Copy OBS CSS", "description": "Copy the OBS Browser Source Custom CSS carrying uploaded assets" },
       "settings-storage": { "title": "Storage settings", "description": "Open cache and storage settings" },
       "settings-r2-sync": { "title": "Sync server settings", "description": "Open sync server settings" },
       "sync-now": { "title": "Sync now", "description": "Sync AI themes" },
@@ -477,6 +479,32 @@ export default {
     "searchNavidrome": "Search navidrome",
     "gridSearchPlaceholder": "Filter songs...",
     "gridSearchNoResults": "No matching songs",
+    "gridBatchSelectionSummary": {
+      "folders": "{{selected}}/{{total}} folders · {{tracks}} tracks",
+      "albums": "{{selected}}/{{total}} albums · {{tracks}} tracks",
+      "artists": "{{selected}}/{{total}} artists · {{tracks}} tracks"
+    },
+    "gridBatchTrackCount": "{{count}} tracks",
+    "gridFolderSelectAll": "Select all",
+    "gridFolderSelectNone": "Select none",
+    "gridFolderTreeToggle": "Expand or collapse folder",
+    "gridFolderTrackCount": "{{count}} tracks in subtree",
+    "gridFolderDirectTrackCount": "{{count}} tracks in this folder",
+    "gridFolderTreeDirectSelection": "This folder only · {{count}} tracks",
+    "gridFolderTreeSelectionCount": "{{selected}}/{{total}} filtered folders selected",
+    "gridFolderTreeEmpty": "No imported directory snapshot is available.",
+    "gridFolderExpandTreePanel": "Expand",
+    "gridFolderCollapseTreePanel": "Collapse",
+    "gridFolderRescanRoot": "Rescan imported root",
+    "gridFolderRemoveRoot": "Remove imported root",
+    "gridFolderAddToQueue": "Add to queue",
+    "gridFolderRemoveSelected": "Remove from library",
+    "gridFolderCreatePlaylistDescription": "Create a playlist with {{count}} selected local tracks.",
+    "gridFolderPlaylistNamePlaceholder": "Playlist name",
+    "gridFolderRemoveSelectedTitle": "Remove selected tracks?",
+    "gridFolderRemoveSelectedDescription": "This removes {{count}} tracks from Folia and its playlists. Files on disk will not be deleted.",
+    "gridFolderRemoveRootTitle": "Remove imported root?",
+    "gridFolderRemoveRootDescription": "Remove {{path}} and all its tracks from Folia? Files on disk will not be deleted.",
     "login": "Login",
     "welcomeBack": "Welcome Back",
     "guestTitle": "Try searching a few songs first",
@@ -1218,7 +1246,12 @@ export default {
     "exportBtn": "Copy Current Config",
     "copyJson": "Copy JSON",
     "copyObsUrl": "Copy OBS URL",
+    "copyObsCss": "Copy OBS CSS",
+    "copyObsCssHint": "Copy the CSS for uploaded assets (custom background / portrait) to paste into the OBS Browser Source Custom CSS box",
+    "obsCssCopiedHint": "CSS copied; paste it into OBS Browser Source -> Custom CSS (use it alongside the link).",
+    "obsCssCopiedHintDegraded": "CSS copied; {{count}} GIF asset(s) exceeded the size budget and were copied as static frames. Paste into OBS Browser Source -> Custom CSS.",
     "obsUrlCustomFontHint": "Copied (includes a custom font); It will fall back to default if not installed on the system.",
+    "obsUrlUploadedAssetHint": "Copied; these settings use uploaded assets -- also click \"Copy OBS CSS\" and paste it into the OBS Browser Source Custom CSS box, otherwise the OBS overlay falls back to defaults.",
     "obsThemeMode": "OBS theme",
     "obsThemeModeStatic": "Pure static",
     "obsThemeModeBuiltin": "Dynamic · Built-in",
@@ -1314,6 +1347,29 @@ export default {
     "noDescription": "No description available",
   },
   "releaseNotes": {
+    "v0_6_18": {
+      "intro": "Here are the new features and improvements in version 0.6.18.",
+      "m3uPlaylists": {
+        "title": "Portable M3U8 Playlists",
+        "description": "Import .m3u8 files into your local library and export Folia playlists as UTF-8 M3U8 files with portable paths. Unmatched or ambiguous paths are reported instead of being added silently."
+      },
+      "gridMapBatchTools": {
+        "title": "Search and Manage Local Collections",
+        "description": "GridMap search now supports multiple terms across names, paths, and metadata. Select folders, albums, or artists in batches to play, queue, create playlists, or remove library entries; folders can also be rescanned without touching files on disk."
+      },
+      "foliaIgnore": {
+        "title": "Flexible .foliaignore Rules",
+        "description": "Add .foliaignore files to imported roots or subfolders to exclude temporary files, cache directories, and unwanted audio with familiar gitignore-style patterns. Changes apply on the next re-import."
+      },
+      "incrementalLocalScans": {
+        "title": "Faster Incremental Library Scans",
+        "description": "Re-imports now reuse unchanged files, detect additions and removals, and load metadata in the background, making large local libraries quicker to refresh."
+      },
+      "localCoverAssets": {
+        "title": "More Efficient Local Artwork",
+        "description": "Local covers are deduplicated into persistent assets and served in size-aware thumbnails, reducing repeated storage and unnecessary full-resolution image work across the library."
+      }
+    },
     "v0_6_17": {
       "intro": "Here are the new features and improvements in version 0.6.17.",
       "sonnetSceneVariants": {
@@ -1450,6 +1506,8 @@ export default {
     "sortDescending": "Descending",
     "importFolder": "Import Folder",
     "importing": "Importing...",
+    "importPlaylist": "Import Playlist",
+    "importingPlaylist": "Importing playlist...",
     "noLocalMusic": "No local music imported yet",
     "noFoldersFound": "No folders found",
     "noAlbumsFound": "No albums found",
@@ -1473,6 +1531,7 @@ export default {
     "deleteFolderCount": "This will remove a total of {{count}} song(s) from your library, including nested subfolders.",
     "deleteFolderNote": "Note: This will only remove songs from your library. Your files on disk will not be affected.",
     "importNotSupported": "Folder import not supported in this browser or cancelled",
+    "insecureHttpDisabled": "Local library is disabled on remote HTTP. Use HTTPS, localhost, or the Electron app.",
     "resyncFailed": "Failed to resync folder. Please try again.",
     "deleteFailed": "Failed to delete folder. Please try again.",
     "matchStatus": "Match Status",
@@ -1536,6 +1595,12 @@ export default {
     "editPlaylist": "Edit Playlist",
     "finishEditing": "Finish Editing",
     "deletePlaylist": "Delete Playlist",
+    "exportPlaylist": "Export M3U8",
+    "playlistImportSuccess": "Imported “{{name}}” with {{count}} track(s).",
+    "playlistImportPartial": "Imported {{count}} track(s) into “{{name}}”; {{skipped}} path(s) were missing or ambiguous.",
+    "playlistImportNoMatches": "No playlist paths matched the local songs currently imported into Folia.",
+    "playlistImportFailed": "Playlist import failed. Make sure the file is a valid M3U or M3U8 playlist.",
+    "playlistExportSuccess": "Exported “{{name}}”.",
     "entityInfo": "{{kind}} Info",
     "entityDisplayName": "Display Name",
     "mergeEntity": "Merge {{kind}}",

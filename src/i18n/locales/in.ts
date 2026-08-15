@@ -189,6 +189,7 @@ export default {
     "run": "Jalankan",
     "recognized": "Dikenali",
     "syncNotConfigured": "Sinkronisasi belum diaktifkan. Konfigurasikan dan aktifkan di pengaturan Penyimpanan terlebih dahulu.",
+    "obsCssNoAsset": "Belum ada aset unggahan yang aktif. Unggah dulu latar, potret, emoji, atau avatar kustom.",
     "previewSearch": "Cari lagu {{source}}: {{query}}",
     "previewQueueSearch": "Cari antrean saat ini: {{query}}",
     "previewQueueSearchEmpty": "Ketik nama lagu, artis, album, atau indeks antrean",
@@ -220,6 +221,7 @@ export default {
       "settings-discord-presence": { "title": "Status pemutaran Discord", "description": "Buka pengaturan Discord Rich Presence" },
       "settings-obs-browser-source": { "title": "Sumber browser OBS", "description": "Buka pengaturan sumber browser OBS" },
       "desktop-toggle-lyric-api": { "title": "API Lirik", "description": "Aktifkan atau nonaktifkan endpoint lirik lokal tanpa autentikasi" },
+      "settings-obs-copy-css": { "title": "Salin CSS OBS", "description": "Salin CSS untuk OBS Browser Source yang membawa aset unggahan" },
       "settings-storage": { "title": "Pengaturan penyimpanan", "description": "Buka pengaturan cache dan penyimpanan" },
       "settings-desktop": { "title": "Pengaturan desktop", "description": "Buka pengaturan aplikasi desktop" },
       "desktop-toggle-voice-input-pause": { "title": "Jeda input suara", "description": "Alihkan jeda pemutaran saat input suara" },
@@ -418,6 +420,30 @@ export default {
     "searchNavidrome": "Cari navidrome",
     "gridSearchPlaceholder": "Filter lagu...",
     "gridSearchNoResults": "Tidak ada lagu yang cocok",
+    "gridBatchSelectionSummary": {
+      "folders": "{{selected}}/{{total}} folder · {{tracks}} lagu",
+      "albums": "{{selected}}/{{total}} album · {{tracks}} lagu",
+      "artists": "{{selected}}/{{total}} artis · {{tracks}} lagu"
+    },
+    "gridBatchTrackCount": "{{count}} lagu",
+    "gridFolderSelectAll": "Pilih semua",
+    "gridFolderSelectNone": "Batalkan semua",
+    "gridFolderTreeToggle": "Buka atau tutup folder",
+    "gridFolderTrackCount": "{{count}} lagu dalam subpohon",
+    "gridFolderTreeSelectionCount": "{{selected}}/{{total}} folder terfilter dipilih",
+    "gridFolderTreeEmpty": "Snapshot direktori impor tidak tersedia.",
+    "gridFolderExpandTreePanel": "Perluas",
+    "gridFolderCollapseTreePanel": "Ciutkan",
+    "gridFolderRescanRoot": "Pindai ulang direktori akar",
+    "gridFolderRemoveRoot": "Hapus direktori akar impor",
+    "gridFolderAddToQueue": "Tambahkan ke antrean",
+    "gridFolderRemoveSelected": "Hapus dari pustaka",
+    "gridFolderCreatePlaylistDescription": "Buat playlist dengan {{count}} lagu lokal terpilih.",
+    "gridFolderPlaylistNamePlaceholder": "Nama playlist",
+    "gridFolderRemoveSelectedTitle": "Hapus lagu terpilih?",
+    "gridFolderRemoveSelectedDescription": "Menghapus {{count}} lagu dari Folia dan playlistnya. Berkas di disk tidak akan dihapus.",
+    "gridFolderRemoveRootTitle": "Hapus direktori akar impor?",
+    "gridFolderRemoveRootDescription": "Hapus {{path}} dan semua lagunya dari Folia? Berkas di disk tidak akan dihapus.",
     "login": "Login",
     "welcomeBack": "Selamat Datang Kembali",
     "guestTitle": "Coba cari beberapa lagu dulu",
@@ -978,7 +1004,12 @@ export default {
     "exportBtn": "Salin Konfigurasi Saat Ini",
     "copyJson": "Salin JSON",
     "copyObsUrl": "Salin URL OBS",
+    "copyObsCss": "Salin CSS OBS",
+    "copyObsCssHint": "Salin CSS untuk aset unggahan (latar / potret kustom) untuk ditempel ke kotak Custom CSS pada OBS Browser Source",
+    "obsCssCopiedHint": "CSS tersalin; tempel ke OBS Browser Source -> Custom CSS (gunakan bersama tautan).",
+    "obsCssCopiedHintDegraded": "CSS tersalin; {{count}} aset GIF melebihi anggaran ukuran dan disalin sebagai bingkai statis. Tempel ke OBS Browser Source -> Custom CSS.",
     "obsUrlCustomFontHint": "Tersalin (termasuk font kustom); kembali ke bawaan jika tidak terpasang di sistem.",
+    "obsUrlUploadedAssetHint": "Tersalin; setelan ini memakai aset unggahan -- klik juga \"Salin CSS OBS\" dan tempel ke kotak Custom CSS pada OBS Browser Source, jika tidak overlay OBS kembali ke bawaan.",
     "obsThemeMode": "Tema OBS",
     "obsThemeModeStatic": "Statis murni",
     "obsThemeModeBuiltin": "Dinamis · Bawaan",
@@ -1089,6 +1120,29 @@ export default {
     "noDescription": "Tidak ada deskripsi tersedia",
   },
   "releaseNotes": {
+    "v0_6_18": {
+      "intro": "Berikut fitur dan peningkatan baru pada versi 0.6.18.",
+      "m3uPlaylists": {
+        "title": "Playlist M3U8 Portabel",
+        "description": "Impor file .m3u8 ke pustaka lokal dan ekspor playlist Folia sebagai M3U8 UTF-8 dengan jalur yang mudah dipindahkan. Jalur yang tidak cocok atau ambigu akan dilaporkan, bukan ditambahkan diam-diam."
+      },
+      "gridMapBatchTools": {
+        "title": "Cari dan Kelola Koleksi Lokal",
+        "description": "Pencarian GridMap kini mendukung beberapa istilah pada nama, jalur, dan metadata. Pilih folder, album, atau artis secara massal untuk memutar, menambahkan ke antrean, membuat playlist, atau menghapusnya dari pustaka; folder juga dapat dipindai ulang tanpa menghapus berkas di disk."
+      },
+      "foliaIgnore": {
+        "title": "Aturan .foliaignore yang Fleksibel",
+        "description": "Tambahkan .foliaignore di direktori akar atau subfolder impor untuk mengecualikan berkas sementara, direktori cache, dan audio yang tidak diperlukan dengan pola bergaya gitignore. Perubahan berlaku saat impor ulang berikutnya."
+      },
+      "incrementalLocalScans": {
+        "title": "Pemindaian Pustaka Lebih Cepat",
+        "description": "Impor ulang kini menggunakan kembali berkas yang tidak berubah, mendeteksi konten baru dan yang dihapus, serta memuat metadata di latar belakang agar pustaka lokal besar lebih cepat diperbarui."
+      },
+      "localCoverAssets": {
+        "title": "Penyimpanan Sampul Lokal Lebih Efisien",
+        "description": "Sampul lokal dideduplikasi berdasarkan konten dan disimpan sebagai aset persisten; antarmuka memakai thumbnail berukuran sesuai kebutuhan untuk mengurangi penyimpanan duplikat dan pemrosesan gambar penuh yang tidak perlu."
+      }
+    },
     "v0_6_17": {
       "intro": "Berikut fitur dan peningkatan baru pada versi 0.6.17.",
       "sonnetSceneVariants": {
@@ -1225,6 +1279,8 @@ export default {
     "sortDescending": "Menurun",
     "importFolder": "Impor Folder",
     "importing": "Mengimpor...",
+    "importPlaylist": "Impor Playlist",
+    "importingPlaylist": "Mengimpor playlist...",
     "noLocalMusic": "Belum ada musik lokal yang diimpor",
     "noFoldersFound": "Tidak ada folder ditemukan",
     "noAlbumsFound": "Tidak ada album ditemukan",
@@ -1312,6 +1368,12 @@ export default {
     "editPlaylist": "Edit Playlist",
     "finishEditing": "Selesai Mengedit",
     "deletePlaylist": "Hapus Playlist",
+    "exportPlaylist": "Ekspor M3U8",
+    "playlistImportSuccess": "Playlist “{{name}}” diimpor dengan {{count}} trek.",
+    "playlistImportPartial": "{{count}} trek diimpor ke “{{name}}”; {{skipped}} jalur tidak ditemukan atau ambigu.",
+    "playlistImportNoMatches": "Tidak ada jalur playlist yang cocok dengan lagu lokal yang telah diimpor ke Folia.",
+    "playlistImportFailed": "Impor playlist gagal. Pastikan file adalah playlist M3U atau M3U8 yang valid.",
+    "playlistExportSuccess": "Playlist “{{name}}” diekspor.",
     "lyricsNotAppliedOtherSaved": "Lirik tidak diterapkan; pilihan lainnya telah disimpan."
   },
   "navidrome": {
