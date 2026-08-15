@@ -6,7 +6,7 @@ import { resolveSearchSource, useSearchNavigationStore } from '../stores/useSear
 import { useSettingsUiStore } from '../stores/useSettingsUiStore';
 import type { LocalLibraryCatalogSnapshot } from '../hooks/useLocalLibraryCatalog';
 import { useShallow } from 'zustand/react/shallow';
-import { SongResult, LocalSong, LocalPlaylist, LocalLibraryGroup, Theme, PlayerState } from '../types';
+import { SongResult, LocalSong, LocalPlaylist, LocalLibraryGroup, Theme, PlayerState, type StatusMessage } from '../types';
 import { getNavidromeConfig, navidromeApi } from '../services/navidromeService';
 import LocalGrid3DView from './app/home/LocalGrid3DView';
 import NavidromeGrid3DView from './app/home/NavidromeGrid3DView';
@@ -16,6 +16,8 @@ import {
     getProviderCollectionArtistLabel,
 } from './app/home/gridViewCollectionAdapters';
 import { importFolder, resyncAllFolders, LOCAL_MUSIC_SCAN_PROGRESS_EVENT } from '../services/localMusicService';
+import { getLocalLibraryAvailability } from '../services/localLibraryAvailability';
+import { importLocalPlaylistFile } from '../services/localPlaylistFileService';
 import { useOnlineProviderQrLogin } from '../hooks/useOnlineProviderQrLogin';
 import type { OnlineProviderPlatformState } from '../hooks/useOnlineProviderPlatform';
 import { omni } from '../services/onlineMusic/omni';
@@ -63,7 +65,7 @@ interface Grid3DProps {
     localSongs: LocalSong[];
     localLibraryCatalog: LocalLibraryCatalogSnapshot;
     localPlaylists: LocalPlaylist[];
-    onRefreshLocalSongs: () => void;
+    onRefreshLocalSongs: () => Promise<void> | void;
     onPlayLocalSong: (song: LocalSong, queue?: LocalSong[]) => void;
     onAddLocalSongToQueue?: (song: LocalSong) => void;
     localMusicState: {
@@ -101,6 +103,7 @@ interface Grid3DProps {
     onPlayAll?: (songs: SongResult[]) => void;
     onAddAllToQueue?: (songs: SongResult[]) => void;
     onAddSongToQueue?: (song: SongResult) => void;
+    onStatusMessage?: (message: StatusMessage) => void;
     onOpenGridView?: (collection: any) => void;
     stageEnabled?: boolean;
     stageIsActive?: boolean;
@@ -132,6 +135,9 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
         onOpenSettings,
         navidromeEnabled = false,
         onOpenGridView,
+        onStatusMessage,
+        onPlayAll,
+        onAddAllToQueue,
         stageEnabled = false,
         stageIsActive = false,
         onOpenStagePlayer,
@@ -206,6 +212,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     const [focusedIndex, setFocusedIndex] = useState(0);
     const gridRootRef = useRef<HTMLDivElement>(null);
     const [isLocalImporting, setIsLocalImporting] = useState(false);
+    const [isLocalPlaylistImporting, setIsLocalPlaylistImporting] = useState(false);
     const [isLocalRefreshing, setIsLocalRefreshing] = useState(false);
     const [scanProgress, setScanProgress] = useState<{
         active: boolean;
@@ -509,7 +516,15 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     };
 
     const handleFolderImport = async () => {
-        if (isLocalImporting || isLocalRefreshing || scanProgress?.active) return;
+        if (isLocalImporting || isLocalPlaylistImporting || isLocalRefreshing || scanProgress?.active) return;
+
+        const availability = getLocalLibraryAvailability();
+        if (!availability.supported) {
+            alert(t(availability.reason === 'insecure-http'
+                ? 'localMusic.insecureHttpDisabled'
+                : 'localMusic.importNotSupported'));
+            return;
+        }
 
         setIsLocalImporting(true);
         try {
@@ -526,7 +541,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     };
 
     const handleRefreshFolders = async () => {
-        if (isLocalImporting || isLocalRefreshing || scanProgress?.active) return;
+        if (isLocalImporting || isLocalPlaylistImporting || isLocalRefreshing || scanProgress?.active) return;
 
         setIsLocalRefreshing(true);
         try {
@@ -538,6 +553,40 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
             console.error('[Grid3D] Failed to resync local folders:', error);
         } finally {
             setIsLocalRefreshing(false);
+        }
+    };
+
+    const handlePlaylistFileImport = async (file: File) => {
+        if (isLocalPlaylistImporting) return;
+
+        setIsLocalPlaylistImporting(true);
+        try {
+            const result = await importLocalPlaylistFile(file, localSongs);
+            if (!result.playlist) {
+                onStatusMessage?.({ type: 'error', text: t('localMusic.playlistImportNoMatches') });
+                return;
+            }
+
+            await onRefreshLocalSongs();
+            const skippedCount = result.unmatchedPaths.length + result.ambiguousPaths.length;
+            onStatusMessage?.({
+                type: skippedCount > 0 ? 'info' : 'success',
+                text: skippedCount > 0
+                    ? t('localMusic.playlistImportPartial', {
+                        name: result.playlist.name,
+                        count: result.matchedSongIds.length,
+                        skipped: skippedCount,
+                    })
+                    : t('localMusic.playlistImportSuccess', {
+                        name: result.playlist.name,
+                        count: result.matchedSongIds.length,
+                    }),
+            });
+        } catch (error) {
+            console.error('[Grid3D] Failed to import local playlist:', error);
+            onStatusMessage?.({ type: 'error', text: t('localMusic.playlistImportFailed') });
+        } finally {
+            setIsLocalPlaylistImporting(false);
         }
     };
 
@@ -675,7 +724,15 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                     ...(showHomeTabPlaylist ? [{ key: 'playlist', label: t('home.playlists'), disabledReason: playlistUnavailableReason }] : []),
                                     ...(showHomeTabRadio ? [{ key: 'radio', label: t('home.radio'), disabledReason: radioUnavailableReason }] : []),
                                     ...(showHomeTabAlbums ? [{ key: 'albums', label: t('home.albums'), disabledReason: albumsUnavailableReason }] : []),
-                                    ...(showHomeTabLocal ? [{ key: 'local', label: t('localMusic.folder'), disabledReason: undefined }] : []),
+                                    ...(showHomeTabLocal ? [{
+                                        key: 'local',
+                                        label: t('localMusic.folder'),
+                                        disabledReason: getLocalLibraryAvailability().supported
+                                            ? undefined
+                                            : t(getLocalLibraryAvailability().reason === 'insecure-http'
+                                                ? 'localMusic.insecureHttpDisabled'
+                                                : 'localMusic.importNotSupported'),
+                                    }] : []),
                                     ...(navidromeEnabled ? [{ key: 'navidrome', label: t('navidrome.title') || 'Navidrome', disabledReason: undefined }] : []),
                                 ].map((tab) => {
                                     const isActive = homeViewTab === tab.key;
@@ -808,16 +865,21 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                             focusedPlaylistIndex={localMusicState.focusedPlaylistIndex}
                             setFocusedPlaylistIndex={(index) => setLocalMusicState(prev => ({ ...prev, focusedPlaylistIndex: index }))}
                             onImportFolder={handleFolderImport}
+                            onImportPlaylistFile={handlePlaylistFileImport}
                             onRefreshFolders={handleRefreshFolders}
-                            importButtonDisabled={isLocalImporting || isLocalRefreshing || Boolean(scanProgress?.active)}
+                            importButtonDisabled={isLocalImporting || isLocalPlaylistImporting || isLocalRefreshing || Boolean(scanProgress?.active)}
                             isImporting={isLocalImporting}
                             isRefreshing={isLocalRefreshing}
                             isScanInProgress={Boolean(scanProgress?.active)}
+                            isImportingPlaylist={isLocalPlaylistImporting}
                             theme={theme}
                             isDaylight={isDaylight}
                             isInteractive={isInteractive}
                             hasFloatingPlayer={Boolean(currentTrack)}
                             onOpenGridView={onOpenGridView}
+                            onPlayAll={onPlayAll}
+                            onAddAllToQueue={onAddAllToQueue}
+                            onRefreshLocalSongs={onRefreshLocalSongs}
                         />
                     </div>
                 ) : (

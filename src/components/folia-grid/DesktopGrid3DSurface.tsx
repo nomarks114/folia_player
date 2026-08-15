@@ -5,6 +5,7 @@ import GridMap from '../GridMap';
 import { Theme } from '../../types';
 import { Grid3DSlider, Grid3DSliderItem } from './Grid3DSlider';
 import { ChevronDown } from 'lucide-react';
+import type { GridMapBatchConfig } from './gridMapBatch';
 
 // src/components/folia-grid/DesktopGrid3DSurface.tsx
 // Shared desktop home surface that keeps Grid3D slider and GridMap controls visually consistent.
@@ -56,6 +57,7 @@ interface DesktopGrid3DSurfaceProps {
     isDaylight: boolean;
     hasFloatingPlayer?: boolean;
     playlistVisibilityScope?: string;
+    batchConfig?: GridMapBatchConfig;
 }
 
 export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
@@ -74,6 +76,7 @@ export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
     isDaylight,
     hasFloatingPlayer = false,
     playlistVisibilityScope = 'default',
+    batchConfig,
 }) => {
     const [showGridMap, setShowGridMap] = useState(false);
     const [tabsExpanded, setTabsExpanded] = useState(false);
@@ -255,9 +258,14 @@ export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
                             id: item.id,
                             name: typeof item.name === 'string' || typeof item.name === 'number' ? String(item.name) : '',
                             coverUrl: item.coverUrl,
-                            description: item.description,
+                            description: item.type === 'folder' && !item.isVirtual
+                                ? String(item.name)
+                                : item.description,
                             summary: item.summary,
+                            trackCount: item.trackCount,
                             type: item.type,
+                            path: item.type === 'folder' && !item.isVirtual ? String(item.name) : undefined,
+                            trackIds: item.trackIds,
                             rawCollection: item,
                         }))}
                         initialFocusedIndex={focusedIndex}
@@ -276,6 +284,7 @@ export const DesktopGrid3DSurface: React.FC<DesktopGrid3DSurfaceProps> = ({
                         isDaylight={isDaylight}
                         isPlaylistHidden={(item) => hiddenPlaylistIds.has(String(item.id))}
                         onTogglePlaylistHidden={togglePlaylistHidden}
+                        batchConfig={batchConfig}
                     />
                 )}
             </AnimatePresence>
