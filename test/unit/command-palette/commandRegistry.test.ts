@@ -25,9 +25,11 @@ const createContext = (overrides: Partial<CommandPaletteContext> = {}): CommandP
     toggleLoop: vi.fn(),
     onReplayGainModeChange: vi.fn(),
     openAudioEqualizer: vi.fn(),
+    applyAudioSoundPreset: vi.fn(),
     handleNextTrack: vi.fn(),
     handlePrevTrack: vi.fn(),
     shuffleQueue: vi.fn(),
+    clearQueue: vi.fn(),
     canGenerateAITheme: true,
     isGeneratingTheme: false,
     generateAITheme: vi.fn(),
@@ -46,6 +48,8 @@ const createContext = (overrides: Partial<CommandPaletteContext> = {}): CommandP
     toggleSubtitleOverlayBackground: vi.fn(),
     alwaysShowPlayerBackButton: false,
     toggleAlwaysShowPlayerBackButton: vi.fn(),
+    alwaysShowTrackSwitchButtons: false,
+    toggleAlwaysShowTrackSwitchButtons: vi.fn(),
     alwaysShowMainWindowTitlebar: false,
     toggleAlwaysShowMainWindowTitlebar: vi.fn(),
     toggleDaylightMode: vi.fn(),
@@ -146,6 +150,16 @@ describe('command palette registry', () => {
         expect(context.openAudioEqualizer).toHaveBeenCalled();
     });
 
+    it('applies a full sound preset from the command palette', () => {
+        const context = createContext();
+        const [match] = getCommandPaletteMatches('低保真', context);
+
+        expect(match.command.id).toBe('playback-sound-preset-lofi');
+        match.command.execute(match.input, context);
+
+        expect(context.applyAudioSoundPreset).toHaveBeenCalledWith('lofi');
+    });
+
     it('matches sync server settings and manual sync commands', () => {
         expect(getCommandPaletteMatches('sync server')[0].command.id).toBe('settings-r2-sync');
         expect(getCommandPaletteMatches('立即同步')[0].command.id).toBe('sync-now');
@@ -224,6 +238,25 @@ describe('command palette registry', () => {
         expect(fullQueue[17].command.queueSong).toBe(playQueue[17]);
         expect(filteredQueue).toHaveLength(1);
         expect(filteredQueue[0].command.queueIndex).toBe(17);
+    });
+
+    it('clears the play queue and hides the command when the queue is empty', () => {
+        const playQueue: SongResult[] = [{
+            id: 1,
+            name: 'Queue Song 1',
+            artists: [{ id: 1, name: 'Artist 1' }],
+            album: { id: 1, name: 'Album 1' },
+            durationMs: 180_000,
+        }];
+        const context = createContext({ playQueue });
+
+        const [match] = getCommandPaletteMatches('清空队列', context);
+        expect(match.command.id).toBe('playback-clear-queue');
+        expect(match.command.execute(match.input, context)).toBe(true);
+        expect(context.clearQueue).toHaveBeenCalled();
+
+        expect(getCommandPaletteMatches('清空队列', createContext())
+            .some(entry => entry.command.id === 'playback-clear-queue')).toBe(false);
     });
 
     it('matches commands by Chinese keyword and pinyin', () => {

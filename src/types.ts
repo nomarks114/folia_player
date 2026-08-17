@@ -697,6 +697,7 @@ export type MonetBackgroundLayout = 'full-overlay' | 'half-pane-gradient';
 export type MonetBackgroundWashColorMode = 'theme' | 'custom';
 export type NomandBackgroundSource = 'cover-derived' | 'uploaded-global';
 export type NomandBackgroundDitheringType = '2x2' | '4x4' | '8x8';
+export type NomandBackgroundEffect = 'dithering' | 'fluted-glass' | 'paper-texture' | 'halftone-dots' | 'lens-distortion';
 export type LatentBackgroundDisplayMode = 'dithering' | 'mesh' | 'both';
 export type LatentBackgroundColorSource = 'cover-theme' | 'cover-only';
 export type MonetAudioStyle = 'bar' | 'line';
@@ -721,15 +722,36 @@ export interface MonetBackgroundTuning {
   backgroundHalfPaneOffsetX: number;
   backgroundWashColorMode: MonetBackgroundWashColorMode;
   backgroundWashCustomColor: string;
+  /** 整张背景图的缓慢缩放漂移；纯 CSS 合成层动画，不参与背景烘焙。 */
+  backgroundDriftEnabled: boolean;
+  /** 漂移幅度 0..1，同时决定位移距离和为防止露边而预放大的倍率。 */
+  backgroundDriftStrength: number;
+  /** 是否在烘焙的 overlay 里绘制那几条 1px 竖向纹理。 */
+  backgroundStreaksEnabled: boolean;
 }
 
 export interface NomandBackgroundTuning {
   imageSource: NomandBackgroundSource;
+  effect: NomandBackgroundEffect;
   ditheringType: NomandBackgroundDitheringType;
   size: number;
   colorSteps: number;
   originalColors: boolean;
   inverted: boolean;
+  flutedGlassSize: number;
+  flutedGlassDistortion: number;
+  flutedGlassBlur: number;
+  paperTextureContrast: number;
+  paperTextureRoughness: number;
+  paperTextureFiber: number;
+  halftoneDotsSize: number;
+  halftoneDotsRadius: number;
+  halftoneDotsContrast: number;
+  halftoneDotsOriginalColors: boolean;
+  halftoneDotsInverted: boolean;
+  lensDistortionSpread: number;
+  lensDistortionBulge: number;
+  lensDistortionDispersion: number;
   overlayEnabled: boolean;
   overlayOpacity: number;
 }
@@ -773,15 +795,33 @@ export const DEFAULT_MONET_BACKGROUND_TUNING: MonetBackgroundTuning = {
   backgroundHalfPaneOffsetX: 0,
   backgroundWashColorMode: 'theme',
   backgroundWashCustomColor: '#8fb7ff',
+  backgroundDriftEnabled: true,
+  backgroundDriftStrength: 0.5,
+  backgroundStreaksEnabled: true,
 };
 
 export const DEFAULT_NOMAND_BACKGROUND_TUNING: NomandBackgroundTuning = {
   imageSource: 'cover-derived',
+  effect: 'dithering',
   ditheringType: '8x8',
   size: 3,
   colorSteps: 4,
   originalColors: false,
   inverted: false,
+  flutedGlassSize: 0.5,
+  flutedGlassDistortion: 0.5,
+  flutedGlassBlur: 0.08,
+  paperTextureContrast: 0.32,
+  paperTextureRoughness: 0.42,
+  paperTextureFiber: 0.3,
+  halftoneDotsSize: 0.5,
+  halftoneDotsRadius: 1.25,
+  halftoneDotsContrast: 0.4,
+  halftoneDotsOriginalColors: false,
+  halftoneDotsInverted: false,
+  lensDistortionSpread: 0.45,
+  lensDistortionBulge: 0.3,
+  lensDistortionDispersion: 0.65,
   overlayEnabled: true,
   overlayOpacity: 0.35,
 };

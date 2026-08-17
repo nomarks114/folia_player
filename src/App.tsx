@@ -148,6 +148,7 @@ export default function App() {
         setLastSeenGuideVersion,
         setIsUserGuideModalOpen,
         openAudioEqualizer,
+        applyAudioSoundPreset,
     } = useSettingsUiStore(useShallow(state => ({
         closeSettings: state.closeSettings,
         isSettingsSubviewOpen: state.isSubSettingsViewOpen,
@@ -158,6 +159,7 @@ export default function App() {
         setLastSeenGuideVersion: state.setLastSeenGuideVersion,
         setIsUserGuideModalOpen: state.setIsUserGuideModalOpen,
         openAudioEqualizer: state.openAudioEqualizer,
+        applyAudioSoundPreset: state.handleApplyAudioSoundPreset,
     })));
     const setThemeQuickEditorContext = useThemeQuickEditorStore(state => state.setContext);
     const openThemeQuickEditor = useThemeQuickEditorStore(state => state.openEditor);
@@ -318,11 +320,10 @@ export default function App() {
         harmonySubtitleBackground,
         visualizerOpacity,
         visualizerBackgroundMode,
+        globalLyricTimelineOffsetMs,
         isDaylight,
         visualizerMode,
         randomVisualizerModePerSong,
-        sonnetPerformanceWarningOpen,
-        sonnetPerformanceWarningDontShowAgain,
         classicTuning,
         cadenzaTuning,
         partitaTuning,
@@ -359,6 +360,7 @@ export default function App() {
         lyricFilterPattern,
         showOpenPanelCloseButton,
         alwaysShowPlayerBackButton,
+        alwaysShowTrackSwitchButtons,
         alwaysShowMainWindowTitlebar,
         enableNowPlayingStage,
         enablePlayerCapStage,
@@ -392,9 +394,6 @@ export default function App() {
         handleSetBackgroundOpacity,
         setDaylightPreference,
         handleSetVisualizerMode,
-        handleSetSonnetPerformanceWarningDontShowAgain,
-        handleConfirmSonnetPerformanceWarning,
-        handleCancelSonnetPerformanceWarning,
         handleToggleRandomVisualizerModePerSong,
         handleSetVisualizerBackgroundMode,
         handleSetMonetBackgroundTuning,
@@ -421,6 +420,7 @@ export default function App() {
         handleSetLyricFilterPattern,
         handleToggleOpenPanelCloseButton,
         handleToggleAlwaysShowPlayerBackButton,
+        handleToggleAlwaysShowTrackSwitchButtons,
         handleToggleAlwaysShowMainWindowTitlebar,
         handleToggleNowPlayingStage,
         handleSetQueueAddBehavior,
@@ -489,13 +489,21 @@ export default function App() {
     useEffect(() => {
         const nextOffsetMs = readLyricOffset(currentSong?.id);
         setLyricTimelineOffsetMs(nextOffsetMs);
-        lyricCurrentTime.set(-nextOffsetMs / 1000);
+        lyricCurrentTime.set(-(nextOffsetMs + globalLyricTimelineOffsetMs) / 1000);
+        // globalLyricTimelineOffsetMs is intentionally not a dependency: it is a device-level constant
+        // the user tunes in Lab settings, and re-running this effect on it would fight the panel value.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSong?.id, lyricCurrentTime]);
 
     const handleLyricTimelineOffsetChange = useCallback((offsetMs: number) => {
         setLyricTimelineOffsetMs(offsetMs);
         writeLyricOffset(currentSongFullRef.current?.id, offsetMs);
     }, []);
+
+    // What every lyric consumer (visualizers, OBS source, Stage/Remote mirrors, lyric API) actually
+    // uses: the per-song manual correction plus the device-wide audio latency compensation. The panel
+    // control below keeps editing the per-song value alone.
+    const effectiveLyricTimelineOffsetMs = lyricTimelineOffsetMs + globalLyricTimelineOffsetMs;
 
     const effectiveLoopMode: StageLoopMode = loopMode;
 
@@ -1286,6 +1294,7 @@ export default function App() {
         skipAfterPlaybackFailure,
         handleStageExternalPlayRequest,
         shuffleQueue,
+        clearQueue,
     } = usePlaybackQueueController({
         t,
         audioQuality,
@@ -1544,7 +1553,7 @@ export default function App() {
         exportState,
         isDaylight,
         lyrics,
-        lyricTimelineOffsetMs,
+        lyricTimelineOffsetMs: effectiveLyricTimelineOffsetMs,
         onRemoteExportCommand: handleExportCommand,
         onExternalPlayRequest: handleStageExternalPlayRequest,
         isLiked: (() => {
@@ -1585,7 +1594,7 @@ export default function App() {
         getNowPlayingDisplayTime,
         getPlayerCapDisplayTime,
         syncNowPlayingClock,
-        lyricTimelineOffsetMs,
+        lyricTimelineOffsetMs: effectiveLyricTimelineOffsetMs,
         lyricCurrentTime,
     });
 
@@ -1846,7 +1855,7 @@ export default function App() {
         lyrics,
         coverUrl,
         currentTime,
-        offsetMs: lyricTimelineOffsetMs,
+        offsetMs: effectiveLyricTimelineOffsetMs,
         duration,
         playerState,
         theme: visualizerTheme,
@@ -1860,6 +1869,8 @@ export default function App() {
         visualizerOpacity,
         subtitleOverlayOpacity,
         subtitleOverlayBackground,
+        showHarmonySubtitle,
+        harmonySubtitleBackground,
         staticMode,
         hideTranslationSubtitle: shouldHidePlayerTranslationSubtitle,
         showSubtitleTranslation,
@@ -1877,7 +1888,7 @@ export default function App() {
     } = useLyricApiPublisher({
         isElectronWindow,
         lyrics,
-        offset: lyricTimelineOffsetMs,
+        offset: effectiveLyricTimelineOffsetMs,
     });
     const canGenerateAITheme = Boolean((lyrics?.lines.length ?? 0) > 0 || currentSong?.isPureMusic);
     const generateCurrentSongTheme = useCallback(() => {
@@ -1951,9 +1962,11 @@ export default function App() {
         toggleLoop,
         onReplayGainModeChange: handleChangeReplayGainMode,
         openAudioEqualizer,
+        applyAudioSoundPreset,
         handleNextTrack,
         handlePrevTrack,
         shuffleQueue,
+        clearQueue,
         playQueue,
         playSong,
         canGenerateAITheme,
@@ -1986,6 +1999,10 @@ export default function App() {
         alwaysShowPlayerBackButton,
         toggleAlwaysShowPlayerBackButton: () => {
             handleToggleAlwaysShowPlayerBackButton(!alwaysShowPlayerBackButton);
+        },
+        alwaysShowTrackSwitchButtons,
+        toggleAlwaysShowTrackSwitchButtons: () => {
+            handleToggleAlwaysShowTrackSwitchButtons(!alwaysShowTrackSwitchButtons);
         },
         alwaysShowMainWindowTitlebar,
         toggleAlwaysShowMainWindowTitlebar: () => {
@@ -2036,6 +2053,7 @@ export default function App() {
         currentSearchSourceTabInPalette,
         setHomeViewTab,
         shuffleQueue,
+        clearQueue,
         submitSearch,
         t,
         toggleBrowserFullscreen,
@@ -2045,6 +2063,7 @@ export default function App() {
         togglePlay,
         handleChangeReplayGainMode,
         openAudioEqualizer,
+        applyAudioSoundPreset,
         transparentPlayerBackground,
         toggleTransparentModeWithHandoff,
         toggleDaylightMode,
@@ -2057,8 +2076,10 @@ export default function App() {
         subtitleOverlayBackground,
         handleToggleSubtitleOverlayBackground,
         handleToggleAlwaysShowPlayerBackButton,
+        handleToggleAlwaysShowTrackSwitchButtons,
         handleToggleAlwaysShowMainWindowTitlebar,
         alwaysShowPlayerBackButton,
+        alwaysShowTrackSwitchButtons,
         alwaysShowMainWindowTitlebar,
         setIsUserGuideModalOpen,
         openThemeQuickEditor,
@@ -2504,6 +2525,8 @@ export default function App() {
         daylightTheme: DAYLIGHT_THEME,
         visualizerMode,
         handleSetVisualizerMode,
+        transparentPlayerBackground,
+        toggleTransparentModeWithHandoff,
         handleManualMatchOnline,
         handleUpdateLocalLyrics,
         handleChangeLyricsSource,
@@ -2752,6 +2775,8 @@ export default function App() {
         handlePlayerPanelAlbumSelect,
         handlePlayerPanelArtistSelect,
         navigateDirectHome,
+        transparentPlayerBackground,
+        toggleTransparentModeWithHandoff,
     ]);
     const appOverlaysModel = useMemo(() => buildAppOverlaysModel({
         currentView,
@@ -2791,6 +2816,13 @@ export default function App() {
         onSeekMainAudio: seekMainAudio,
         onStagePlayerSeek: publishStagePlayerPlaybackUpdate,
         noTrackText: t('ui.noTrack'),
+        playQueue,
+        isFmMode,
+        isNowPlayingStageActive,
+        handlePrevTrack,
+        handleNextTrack,
+        prevTrackLabel: t('ui.previousTrack'),
+        nextTrackLabel: t('ui.nextTrack'),
     }), [
         activePlaybackContext,
         audioSrc,
@@ -2802,6 +2834,11 @@ export default function App() {
         devDebugSnapshot,
         duration,
         effectiveLoopMode,
+        handleNextTrack,
+        handlePrevTrack,
+        isFmMode,
+        isNowPlayingStageActive,
+        playQueue,
         handleSearchResultAddToQueue,
         handleSearchResultAlbumOpen,
         handleSearchResultArtistOpen,
@@ -2824,6 +2861,7 @@ export default function App() {
         stageActiveEntryKind,
         stageLyricsClockRef,
         syncStageLyricsClock,
+        t,
         theme,
         toggleLoop,
         togglePlay,
@@ -2837,6 +2875,8 @@ export default function App() {
         currentSongTitle: currentSong?.name || null,
         loadLyricFilterPreview: loadCurrentSongLyricPreview,
         onSaveLyricFilterPattern: handleSaveLyricFilterPattern,
+        currentLyrics: lyrics,
+        lyricCurrentTime,
         stageStatus,
         stageSource,
         activePlaybackContext,
@@ -2869,6 +2909,8 @@ export default function App() {
         leaveStagePlayback,
         loadCurrentSongLyricPreview,
         loadStageSessionIntoPlayback,
+        lyricCurrentTime,
+        lyrics,
         nowPlayingConnectionStatus,
         playerCapConnectionStatus,
         playerCapPlayers,
@@ -2903,11 +2945,6 @@ export default function App() {
         handleUnavailableReplacementConfirm,
         settingsDialog,
         providerSwitchConfirmDialog,
-        sonnetPerformanceWarningOpen,
-        sonnetPerformanceWarningDontShowAgain,
-        handleSetSonnetPerformanceWarningDontShowAgain,
-        handleConfirmSonnetPerformanceWarning,
-        handleCancelSonnetPerformanceWarning,
     }), [
         currentSong,
         handleLyricMatchComplete,
@@ -2918,11 +2955,6 @@ export default function App() {
         localSongs,
         pendingUnavailableReplacement,
         providerSwitchConfirmDialog,
-        sonnetPerformanceWarningOpen,
-        sonnetPerformanceWarningDontShowAgain,
-        handleSetSonnetPerformanceWarningDontShowAgain,
-        handleConfirmSonnetPerformanceWarning,
-        handleCancelSonnetPerformanceWarning,
         setPendingUnavailableReplacement,
         setShowLyricMatchModal,
         setShowNaviLyricMatchModal,

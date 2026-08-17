@@ -145,6 +145,7 @@ export default {
     "noPlayableSongs": "Tidak ada lagu yang bisa diputar di daftar ini",
     "songUnavailableTag": "Tidak Tersedia",
     "queueShuffled": "Antrean diacak",
+    "queueCleared": "Antrean dikosongkan",
     "queueUpdated": "Ditambahkan ke antrean",
     "copiedSongInfo": "Info lagu disalin",
     "copied": "Disalin",
@@ -250,6 +251,7 @@ export default {
       "playback-prev": { "title": "Lagu sebelumnya", "description": "Putar lagu sebelumnya" },
       "playback-loop": { "title": "Alihkan loop", "description": "Ubah mode loop" },
       "playback-shuffle": { "title": "Acak antrean", "description": "Acak antrean putar saat ini" },
+      "playback-clear-queue": { "title": "Kosongkan antrean", "description": "Hapus semua lagu dari antrean putar saat ini" },
       "theme-generate-current": { "title": "Buat tema AI", "description": "Buat tema AI untuk lagu saat ini" },
       "theme-quick-editor": { "title": "Editor tema cepat", "description": "Edit cepat tema AI untuk lagu saat ini" },
       "playback-auto-match-best-lyric": { "title": "Cocokkan lirik terbaik", "description": "Jalankan pencocokan lirik terbaik otomatis untuk lagu saat ini" },
@@ -264,6 +266,7 @@ export default {
       "background-monet-full-overlay": { "title": "Latar: Overlay Layar Penuh Monet", "description": "Alihkan latar ke tata letak overlay layar penuh Monet" },
       "background-monet-half-gradient": { "title": "Latar: Gradien Setengah Layar Monet", "description": "Alihkan latar ke tata letak gradien setengah layar Monet" },
       "background-common": { "title": "Latar: Umum", "description": "Alihkan latar ke tata letak umum" },
+      "background-nomand": { "title": "Latar: Nomand", "description": "Alihkan latar ke efek gambar Paper" },
       "background-latent": { "title": "Latar: Latent", "description": "Alihkan ke shader reaktif audio berwarna sampul" },
       "background-latent-dithering": { "title": "Latent: Piksel", "description": "Tampilkan hanya lapisan Dithering" },
       "background-latent-mesh": { "title": "Latent: Fluida", "description": "Tampilkan hanya lapisan MeshGradient" },
@@ -287,6 +290,8 @@ export default {
     "play": "Putar",
     "pause": "Jeda",
     "noTrack": "Tidak Ada Trek",
+    "previousTrack": "Trek sebelumnya",
+    "nextTrack": "Trek berikutnya",
     "loopingOn": "Loop Aktif",
     "loopOff": "Loop Mati",
     "toggleBackground": "Alihkan Latar Belakang",
@@ -718,6 +723,7 @@ export default {
     "visualizerBackgroundMode": "Jenis Latar Belakang",
     "visualizerBackgroundModeCommon": "Umum",
     "visualizerBackgroundModeMonet": "Monet",
+    "visualizerBackgroundModeNomand": "Nomand",
     "visualizerBackgroundModeLatent": "Latent",
     "latentBackgroundSettings": "Latar Latent",
     "latentBackgroundSettingsDesc": "Gabungkan shader piksel dan fluida berwarna sampul dengan respons kecepatan audio.",
@@ -958,6 +964,35 @@ export default {
     "monetBackgroundSourceUploaded": "Gambar Diunggah",
     "monetUploadBackground": "Unggah Latar Belakang",
     "monetClearBackground": "Hapus Latar Belakang",
+    "nomandBackgroundSettings": "Latar Nomand",
+    "nomandBackgroundSettingsDesc": "Terapkan efek gambar Paper pada sampul saat ini atau gambar yang diunggah.",
+    "nomandBackgroundSource": "Sumber Gambar",
+    "nomandBackgroundEffect": "Efek",
+    "nomandBackgroundEffectDithering": "Dithering",
+    "nomandBackgroundEffectFlutedGlass": "Kaca Beralur",
+    "nomandBackgroundEffectPaperTexture": "Tekstur Kertas",
+    "nomandBackgroundEffectHalftoneDots": "Titik Halftone",
+    "nomandBackgroundEffectLensDistortion": "Distorsi Lensa",
+    "nomandBackgroundDitheringType": "Pola Dithering",
+    "nomandBackgroundSize": "Ukuran Grid",
+    "nomandBackgroundColorSteps": "Jumlah Warna",
+    "nomandBackgroundOriginalColors": "Pertahankan Warna Asli Gambar",
+    "nomandBackgroundInverted": "Balik Luminansi Gambar",
+    "nomandBackgroundFlutedGlassSize": "Ukuran Alur",
+    "nomandBackgroundFlutedGlassDistortion": "Distorsi",
+    "nomandBackgroundFlutedGlassBlur": "Blur",
+    "nomandBackgroundPaperTextureContrast": "Kontras",
+    "nomandBackgroundPaperTextureRoughness": "Kekasaran",
+    "nomandBackgroundPaperTextureFiber": "Serat",
+    "nomandBackgroundHalftoneDotsSize": "Ukuran Titik",
+    "nomandBackgroundHalftoneDotsRadius": "Radius Titik",
+    "nomandBackgroundHalftoneDotsContrast": "Kontras",
+    "nomandBackgroundLensDistortionSpread": "Pemisahan Warna",
+    "nomandBackgroundLensDistortionBulge": "Tonjolan Lensa",
+    "nomandBackgroundLensDistortionDispersion": "Dispersi Warna",
+    "nomandBackgroundOverlay": "Overlay Keterbacaan",
+    "nomandBackgroundOverlayDesc": "Lapiskan warna latar tema aktif di atas efek gambar untuk meningkatkan keterbacaan lirik.",
+    "nomandBackgroundOverlayOpacity": "Opasitas Overlay",
     "monetKeywordColoring": "Pewarnaan Kata Kunci",
     "monetKeywordColoringOn": "Aktifkan",
     "monetKeywordColoringOff": "Nonaktifkan",
@@ -965,6 +1000,11 @@ export default {
     "monetLayoutFullOverlay": "Overlay Penuh",
     "monetLayoutHalfPane": "Panel Setengah",
     "monetHalfPaneOffsetX": "Offset Horizontal Gambar",
+    "monetBackgroundDriftEnabled": "Pergeseran Lambat",
+    "monetBackgroundDriftEnabledDesc": "Membuat gambar latar bergeser dan bernapas perlahan. Gambar diperbesar sedikit agar tepinya tidak pernah terlihat.",
+    "monetBackgroundDriftStrength": "Kekuatan Pergeseran",
+    "monetBackgroundStreaksEnabled": "Garis Vertikal",
+    "monetBackgroundStreaksEnabledDesc": "Menggambar garis tipis vertikal di atas latar belakang.",
     "monetBackgroundPostProcessing": "Perlakuan Gambar Latar Belakang",
     "monetBackgroundBlur": "Blur Latar Belakang",
     "monetBackgroundOverlayOpacity": "Kekuatan Overlay",
@@ -1120,6 +1160,29 @@ export default {
     "noDescription": "Tidak ada deskripsi tersedia",
   },
   "releaseNotes": {
+    "v0_6_19": {
+      "intro": "Berikut fitur dan peningkatan baru pada versi 0.6.19.",
+      "audioEffectChain": {
+        "title": "Efek Audio Pasca-EQ",
+        "description": "Equalizer kini mendukung rantai efek setelah band frekuensi, dengan kontrol pembentukan nada, saturasi, bit crush, wow, noise vinil, lebar stereo, ruang, dan dinamika yang dapat disimpan dalam preset suara."
+      },
+      "globalLyricOffset": {
+        "title": "Offset Waktu Lirik Global",
+        "description": "Geser garis waktu lirik untuk semua lagu di perangkat ini guna mengompensasi latensi Bluetooth atau keluaran lain, dengan pratinjau langsung untuk penyetelan."
+      },
+      "obsCustomCssAssets": {
+        "title": "Aset Unggahan OBS melalui CSS Kustom",
+        "description": "Salin potongan CSS siap tempel untuk membawa latar belakang, potret, dan aset unggahan lain ke OBS Browser Source. GIF tetap beranimasi jika sesuai batas ukuran; GIF yang terlalu besar disalin sebagai bingkai statis."
+      },
+      "trackSwitchPreview": {
+        "title": "Pergantian Lagu Lebih Jelas",
+        "description": "Arahkan kursor ke kontrol lagu sebelumnya dan berikutnya pada pemutar mengambang untuk melihat pratinjau judul, tampilkan panah navigasi secara permanen, dan kosongkan antrean dari Palette Perintah."
+      },
+      "visualizerBackgroundEffects": {
+        "title": "Efek Latar Visualizer Lebih Kaya",
+        "description": "Latar Monet dapat bergeser perlahan dengan garis vertikal opsional, sementara Nomand menambahkan kontrol dithering, kaca beralur, tekstur kertas, titik halftone, dan distorsi lensa."
+      }
+    },
     "v0_6_18": {
       "intro": "Berikut fitur dan peningkatan baru pada versi 0.6.18.",
       "m3uPlaylists": {
