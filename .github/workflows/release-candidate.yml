@@ -100,7 +100,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest]
 
     steps:
       - name: Check out Git repository
@@ -176,14 +176,9 @@ jobs:
         with:
           name: pre-release-${{ matrix.os }}
           path: |
-            release/*.dmg
-            release/*.zip
             release/*.exe
             release/*.blockmap
             release/latest*.yml
-            release/*.deb
-            release/*.rpm
-            release/*.tar.gz
             build/pre-release-notes.md
           if-no-files-found: error
           retention-days: 14

@@ -228,46 +228,6 @@ function Deploy-NodeWithPm2 {
     Write-SyncTokenReminder -Token $loadedSyncToken
 }
 
-function Deploy-Docker {
-    Write-Step "开始进行 Docker 部署..."
-    if (-not (Test-CommandExists 'docker')) {
-        throw "未检测到 Docker 环境，请先手动安装 Docker Desktop。"
-    }
-
-    Ensure-EnvFile | Out-Null
-
-    Write-Step "正在构建并启动 Docker 容器..."
-    & docker compose version 1>$null 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        Invoke-Tool -FilePath 'docker' -ArgumentList @('compose', '-f', '../deploy/docker/compose.sync.yaml', 'up', '-d', '--build')
-    }
-    elseif (Test-CommandExists 'docker-compose') {
-        Invoke-Tool -FilePath 'docker-compose' -ArgumentList @('-f', '../deploy/docker/compose.sync.yaml', 'up', '-d', '--build')
-    }
-    else {
-        throw "未检测到 docker compose 或 docker-compose。"
-    }
-
-    Write-SuccessLine "=========================================="
-    Write-SuccessLine "    部署完成！"
-    Write-SuccessLine "=========================================="
-    Write-Section "你的同步服务端已映射到本地 13000 端口（容器内 3000）。"
-    Write-Host "使用此命令查看日志： docker logs -f folia-sync"
-
-    $envPath = Join-Path $PSScriptRoot '.env'
-    $loadedSyncToken = ""
-    if (Test-Path $envPath) {
-        $envContent = Get-Content -Path $envPath
-        foreach ($line in $envContent) {
-            if ($line -match '^SYNC_TOKEN=(.*)$') {
-                $loadedSyncToken = $matches[1]
-                break
-            }
-        }
-    }
-    Write-SyncTokenReminder -Token $loadedSyncToken
-}
-
 function Deploy-CloudflareWorkers {
     Write-Step "开始进行 Cloudflare Workers 部署..."
     Ensure-NodeAndNpm
@@ -314,14 +274,12 @@ Write-Section "=========================================="
 Write-Host ''
 Write-Host '请选择部署方式：'
 Write-Host '  1) Node (PM2)' -ForegroundColor Yellow
-Write-Host '  2) Docker' -ForegroundColor Yellow
-Write-Host '  3) Cloudflare Workers' -ForegroundColor Yellow
-$deployChoice = Read-Host '请输入选项 [1-3]'
+Write-Host '  2) Cloudflare Workers' -ForegroundColor Yellow
+$deployChoice = Read-Host '请输入选项 [1-2]'
 Write-Host ''
 
 switch ($deployChoice) {
     '1' { Deploy-NodeWithPm2 }
-    '2' { Deploy-Docker }
-    '3' { Deploy-CloudflareWorkers }
+    '2' { Deploy-CloudflareWorkers }
     default { throw '无效的选择。退出脚本。' }
 }

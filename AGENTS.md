@@ -54,7 +54,7 @@
 
 - `prepare-folia-release`
   路径：`skills/prepare-folia-release/SKILL.md`
-  用于进入稳定版本发布流程：汇总上个稳定版本以来的用户可感知变化，更新新功能介绍、桌面与 Docker 版本元数据，并生成可手动粘贴的 Markdown release note。
+  用于进入稳定版本发布流程：汇总上个稳定版本以来的用户可感知变化，更新新功能介绍、桌面版本元数据，并生成可手动粘贴的 Markdown release note。
 
 全局沟通规则：
 

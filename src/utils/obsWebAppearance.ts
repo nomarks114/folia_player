@@ -81,7 +81,7 @@ export function parseObsWebParams(search: string): ObsWebParams {
 }
 
 // Dynamic AI overlay params: returns the AI connection under obsTheme=ai, else null. The overlay is
-// keyless — the provider comes from Docker runtime config or the Vite build fallback
+// keyless — the provider comes from runtime config or the Vite build fallback
 // key — so the URL carries only the mode marker, no AI secrets.
 export function parseObsAiParams(search: string): ObsAiConfig | null {
   const params = new URLSearchParams(search);

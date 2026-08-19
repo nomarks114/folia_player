@@ -30,9 +30,7 @@ import { getWebAiProvider } from '../../services/runtimeConfig';
 import type { LyricApiStatus } from '../../types/lyricApi';
 
 const DEFAULT_OPENAI_TEMPERATURE = '0.7';
-const VERSION_INFO = __DOCKER_STACK_VERSION__
-    ? `${__APP_VERSION_LABEL__} v${__APP_VERSION__} · Stack ${__DOCKER_STACK_VERSION__} · ${__COMMIT_HASH__}`
-    : `${__APP_VERSION_LABEL__} v${__APP_VERSION__} - ${__GIT_BRANCH__} - ${__COMMIT_HASH__}`;
+const VERSION_INFO = `${__APP_VERSION_LABEL__} v${__APP_VERSION__} - ${__GIT_BRANCH__} - ${__COMMIT_HASH__}`;
 
 interface SettingsModalProps {
     onClose: () => void;
@@ -1379,7 +1377,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                     )
                                                 )}
 
-                                                {showQuarkDownload && updateStatus.platform !== 'linux' && (
+                                                {showQuarkDownload && (
                                                     <>
                                                         <span className="opacity-25 select-none" style={{ color: 'var(--text-secondary)' }}>|</span>
 
@@ -1407,19 +1405,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             </div>
                                         )}
 
-                                        {/* 第三行：多平台网络与手动下载提醒小字 */}
+                                        {/* 第三行：手动下载提醒小字 */}
                                         {updateStatus?.availableVersion && (
                                             <div className="text-xs opacity-60 mt-0.5 space-y-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                                {(updateStatus.platform === 'darwin' || updateStatus.platform === 'linux' || !updateStatus.supported) && (
+                                                {!updateStatus.supported && (
                                                     <div>
-                                                        {updateStatus.platform === 'darwin'
-                                                            ? t('options.macManualUpdateNotice')
-                                                            : updateStatus.platform === 'linux'
-                                                            ? t('options.linuxManualUpdateNotice')
-                                                            : t('options.manualUpdateNotice')}
+                                                        {t('options.manualUpdateNotice')}
                                                     </div>
                                                 )}
-                                                {showQuarkDownload && updateStatus.platform !== 'linux' && (
+                                                {showQuarkDownload && (
                                                     <div>{t('options.chinaDownloadHint')}</div>
                                                 )}
                                             </div>

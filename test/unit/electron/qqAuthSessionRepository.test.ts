@@ -26,10 +26,9 @@ function createStore() {
 
 // Reversible byte transformation: deterministic enough for the unit test while ensuring the fake
 // disk value is not merely the plaintext JSON wrapped in base64.
-function createSafeStorage(backend = 'dpapi') {
+function createSafeStorage() {
     return {
         isEncryptionAvailable: vi.fn(() => true),
-        getSelectedStorageBackend: vi.fn(() => backend),
         encryptString: vi.fn((plaintext: string): Buffer =>
             Buffer.from(Buffer.from(plaintext, 'utf8').map((byte) => byte ^ 0xa5))),
         decryptString: vi.fn((ciphertext: Buffer) =>
@@ -57,22 +56,6 @@ describe('QQ auth session repository', () => {
         expect(persisted).not.toContain('qq-secret-musickey');
         expect(repository.load()).toEqual(sessions);
         expect(repository.kind).toBe('electron-safe-storage');
-        if (process.platform !== 'linux') {
-            expect(safeStorage.getSelectedStorageBackend).not.toHaveBeenCalled();
-        }
-    });
-
-    it('refuses Linux basic_text instead of persisting credentials without encryption', () => {
-        const store = createStore();
-        const repository = createQqAuthSessionRepository({
-            store,
-            safeStorage: createSafeStorage('basic_text'),
-            platform: 'linux',
-        });
-
-        expect(() => repository.save([{ token: 'opaque-token' }]))
-            .toThrow(/unencrypted basic_text/);
-        expect(store.set).not.toHaveBeenCalled();
     });
 
     it('can clear stale ciphertext even if encryption becomes unavailable', () => {

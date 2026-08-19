@@ -15,14 +15,6 @@ const { createLyricApi } = require('./lyricApi.cjs');
 const { createLocalCoverAssetStore, getLocalCoverAssetDirectory } = require('./localCoverAssets.cjs');
 const { getReleaseUrl, getUpdateProviderConfig, resolveReleaseChannel } = require('./updateChannels.cjs');
 const { sanitizeDualTheme: sanitizeGeneratedDualTheme } = require('../shared/themeSanitizer.cjs');
-const useLinuxGraphicsDebugMode = process.env.ELECTRON_LINUX_PACKAGED_GRAPHICS === 'true';
-const isAppImageRuntime =
-  process.platform === 'linux' &&
-  (Boolean(process.env.APPIMAGE) || Boolean(process.env.APPDIR) || useLinuxGraphicsDebugMode);
-const linuxGraphicsMode =
-  process.platform !== 'linux'
-    ? 'system'
-    : (process.env.FOLIA_LINUX_GRAPHICS_MODE || (isAppImageRuntime ? 'swiftshader' : 'system'));
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'folia-cover',
@@ -57,38 +49,7 @@ app.on('certificate-error', (event, _webContents, requestUrl, error, _certificat
   callback(false);
 });
 
-// Fix for Arch Linux / Wayland & Vulkan compatibility issues
-if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('disable-vulkan');
-  app.commandLine.appendSwitch('disable-features', 'Vulkan');
-  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
-  app.commandLine.appendSwitch('log-level', '3');
-
-  if (linuxGraphicsMode === 'software') {
-    // Hard fallback: safest, but usually slower.
-    app.disableHardwareAcceleration();
-  } else if (linuxGraphicsMode === 'swiftshader') {
-    // AppImage is the only runtime showing broken blur/opacity plus GPU crashes.
-    // Prefer software GL here so Chromium keeps its compositor pipeline
-    // without relying on the host Vulkan / GPU stack.
-    app.commandLine.appendSwitch('use-gl', 'angle');
-    app.commandLine.appendSwitch('use-angle', 'swiftshader');
-    app.commandLine.appendSwitch('enable-unsafe-swiftshader');
-  } else {
-    app.commandLine.appendSwitch('enable-features', 'WaylandWindowDecorations');
-  }
-}
-
-// macOS: GPU 加速优化，解决 Intel Mac + AMD 独显在 Retina 屏幕下的渲染卡顿
-if (process.platform === 'darwin' && process.arch === 'x64') {
-  app.commandLine.appendSwitch('ignore-gpu-blocklist');
-  app.commandLine.appendSwitch('use-angle', 'gl');
-  app.commandLine.appendSwitch('enable-gpu-rasterization');
-}
-
 const store = new Store({ projectName: 'Folia' });
-// KuGou credentials stay inside the main process and are encrypted lazily after Electron is ready.
-// The bridge refuses Linux's plaintext `basic_text` fallback and degrades to an in-memory session.
 const kugouApiBridge = createKugouApiBridge({ store, safeStorage });
 const qqAuthSessionRepository = createQqAuthSessionRepository({ store, safeStorage });
 
@@ -209,10 +170,6 @@ const REMOTE_CONTROL_WINDOW_TITLE = 'Folia Remote';
 const WINDOW_PLAYBACK_HANDOFF_REQUEST_TIMEOUT_MS = 800;
 const bundledAppIconPath = path.join(__dirname, '../build/icon.png');
 const extraResourceIconPath = path.join(process.resourcesPath, 'icon.png');
-const bundledMacTrayIconPath = path.join(__dirname, '../build/trayTemplate.png');
-const bundledMacTrayIcon2xPath = path.join(__dirname, '../build/trayTemplate@2x.png');
-const extraResourceMacTrayIconPath = path.join(process.resourcesPath, 'trayTemplate.png');
-const extraResourceMacTrayIcon2xPath = path.join(process.resourcesPath, 'trayTemplate@2x.png');
 const APP_ICON_PATH = fs.existsSync(bundledAppIconPath) ? bundledAppIconPath : extraResourceIconPath;
 const THUMBAR_ICON_DIR = path.join(__dirname, '../build/thumbar');
 
@@ -228,52 +185,15 @@ function loadThumbarIcon(name) {
   });
 }
 
-const THUMBAR_BUTTON_ICONS = process.platform === 'win32'
-  ? {
-    previous: loadThumbarIcon('previous.png'),
-    play: loadThumbarIcon('play.png'),
-    pause: loadThumbarIcon('pause.png'),
-    next: loadThumbarIcon('next.png'),
-  }
-  : null;
+const THUMBAR_BUTTON_ICONS = {
+  previous: loadThumbarIcon('previous.png'),
+  play: loadThumbarIcon('play.png'),
+  pause: loadThumbarIcon('pause.png'),
+  next: loadThumbarIcon('next.png'),
+};
 
-// macOS menu bar icons should be monochrome template images with transparent backgrounds.
 function createTrayIconImage() {
-  if (process.platform !== 'darwin') {
-    return APP_ICON_PATH;
-  }
-
-  if (!nativeImage || typeof nativeImage.createFromPath !== 'function') {
-    return APP_ICON_PATH;
-  }
-
-  const trayImagePath = fs.existsSync(bundledMacTrayIconPath)
-    ? bundledMacTrayIconPath
-    : extraResourceMacTrayIconPath;
-  const trayImage2xPath = fs.existsSync(bundledMacTrayIcon2xPath)
-    ? bundledMacTrayIcon2xPath
-    : extraResourceMacTrayIcon2xPath;
-  const trayImage = nativeImage.createFromPath(trayImagePath);
-
-  if (trayImage.isEmpty()) {
-    return APP_ICON_PATH;
-  }
-
-  const retinaImage = nativeImage.createFromPath(trayImage2xPath);
-  if (!retinaImage.isEmpty()) {
-    trayImage.addRepresentation({
-      scaleFactor: 2.0,
-      width: 32,
-      height: 32,
-      buffer: retinaImage.toPNG(),
-    });
-  }
-
-  if (typeof trayImage.setTemplateImage === 'function') {
-    trayImage.setTemplateImage(true);
-  }
-
-  return trayImage;
+  return APP_ICON_PATH;
 }
 
 function readStoredBoolean(settingKey, fallback = false) {
@@ -525,7 +445,7 @@ function saveWindowState(win, options = {}) {
 }
 
 function isWindowsThumbarSupported() {
-  return process.platform === 'win32';
+  return true;
 }
 
 function sendThumbarAction(action) {
@@ -1226,9 +1146,6 @@ function normalizeUpdateChannelSelection(value) {
 }
 
 function getUpdateCheckSupportReason() {
-  if (process.platform !== 'win32') {
-    return 'system';
-  }
   return getCurrentReleaseChannel().updateEnabled ? null : 'channel';
 }
 
@@ -2890,10 +2807,9 @@ function createWindow(options = {}) {
     frame: false,
     transparent: useTransparentWindow,
     hasShadow: !useTransparentWindow,
-    thickFrame: process.platform === 'win32' ? !useTransparentWindow : undefined,
+    thickFrame: !useTransparentWindow,
     backgroundColor: (useTransparentWindow || enableNativeBlur) ? '#00000000' : '#09090b',
-    vibrancy: (!useTransparentWindow && enableNativeBlur) && process.platform === 'darwin' ? 'fullscreen-ui' : undefined,
-    backgroundMaterial: (!useTransparentWindow && enableNativeBlur) && process.platform === 'win32' ? 'acrylic' : undefined,
+    backgroundMaterial: (!useTransparentWindow && enableNativeBlur) ? 'acrylic' : undefined,
     autoHideMenuBar: true,
     icon: APP_ICON_PATH,
     skipTaskbar: mainWindowSkipTaskbarEnabled,
@@ -3002,9 +2918,7 @@ async function setMainWindowTransparentModeFromRemote(enabled) {
 }
 
 app.whenReady().then(async () => {
-  if (process.platform === 'win32') {
-    app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
-  }
+  app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 
   setupFileSystemAccessPermissionHandlers();
   setupCorsBypassHandlers();
@@ -3063,9 +2977,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   clearPendingWindowPlaybackHandoffRequests();
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  app.quit();
 });
 
 app.on('before-quit', () => {
@@ -3134,11 +3046,7 @@ ipcMain.handle('save-settings', (event, key, value) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         const enableNativeBlur = Boolean(nextValue);
         mainWindow.setBackgroundColor(enableNativeBlur ? '#00000000' : '#09090b');
-        if (process.platform === 'darwin') {
-          mainWindow.setVibrancy(enableNativeBlur ? 'fullscreen-ui' : null);
-        } else if (process.platform === 'win32') {
-          mainWindow.setBackgroundMaterial(enableNativeBlur ? 'acrylic' : 'none');
-        }
+        mainWindow.setBackgroundMaterial(enableNativeBlur ? 'acrylic' : 'none');
       }
     }
   }

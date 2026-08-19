@@ -1,6 +1,6 @@
 ---
 name: prepare-folia-release
-description: Prepare a new stable Folia release from the commits since the latest reachable stable vA.B.C tag. Use when entering a new-version or Realeco release flow, drafting user-facing changes, updating NewFeaturesIntro content and locales, bumping desktop and Docker versions, synchronizing realeco-release/package metadata, or producing paste-ready Markdown release notes.
+description: Prepare a new stable Folia release from the commits since the latest reachable stable vA.B.C tag. Use when entering a new-version or Realeco release flow, drafting user-facing changes, updating NewFeaturesIntro content and locales, bumping desktop versions, synchronizing realeco-release/package metadata, or producing paste-ready Markdown release notes.
 ---
 
 # Prepare Folia Release
@@ -50,15 +50,13 @@ Keep card IDs identical across the release definition and all locales. Preserve 
 
 ## 4. Update release versions
 
-Desktop/Realeco and Docker are independent version streams. Never copy one version into the other merely for consistency.
+Desktop/Realeco is the only version stream.
 
 For desktop/Realeco, write the same stable `A.B.C` value to:
 
 - `package.json` → `version`;
 - `package-lock.json` → the top-level `version` and `packages[""].version`;
 - `realeco-release` → exactly one version line with a trailing newline.
-
-For Docker, update `deploy/docker/VERSION` to a stable version greater than its current value. If the user did not specify a Docker version, propose the next patch version separately and confirm it before writing.
 
 The eventual release commit's complete message must be exactly `release: vA.B.C`; extra body text fails `.github/workflows/electron-release.yml`. Report this requirement, but do not create the commit without explicit authorization.
 
@@ -72,7 +70,6 @@ The eventual release commit's complete message must be exactly `release: vA.B.C`
 ```powershell
 git diff --check
 npm run test:unit -- test/unit/realecoReleaseMetadata.test.ts
-bash deploy/docker/scripts/validate-version.sh deploy/docker/VERSION <previous-docker-version>
 ```
 
 5. Follow `skills/testing-strategy/SKILL.md` for any additional validation. Do not run a full Electron package by default. If a dev server is already running, inspect its errors instead of starting another build.
@@ -80,7 +77,7 @@ bash deploy/docker/scripts/validate-version.sh deploy/docker/VERSION <previous-d
 
 ## 6. Return the handoff
 
-Report the comparison range, desktop version, Docker version, changed files, and validation results. Then provide a directly copyable Markdown block, written for users rather than developers:
+Report the comparison range, desktop version, changed files, and validation results. Then provide a directly copyable Markdown block, written for users rather than developers:
 
 ```markdown
 ## 更新说明

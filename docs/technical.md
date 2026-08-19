@@ -21,20 +21,6 @@ Realeco 发布仅在 `main` 修改根目录 `realeco-release` 时触发。自动
 
 Cielo 的 `[canary]` 推送会更新滚动的 `cielo` prerelease，供 Cielo 通道客户端获取更新。手动运行 Cielo 工作流时可选择 `branch-release`，为当前分支和提交创建独立的 `cielo-<branch>-<sha>` prerelease，供人工下载和回归；该 Release 不参与客户端自动更新。选择 `artifacts` 则不创建 Release，只将各平台构建产物保留 14 天。
 
-### Linux 获取方式
-
-1. Arch Linux / Manjaro：通过 AUR 安装 `folia-major-bin`
-
-```bash
-yay -S folia-major-bin
-```
-
-2. Debian / Ubuntu / Linux Mint：下载 `.deb`
-3. Fedora / RHEL / openSUSE：下载 `.rpm`
-4. 其他发行版：下载 `tar.gz`，解压后直接运行 `folia-major`
-
-`tar.gz` 包中附带图标与 `.desktop` 模板，可按需手动创建桌面启动项。
-
 ### Quickshell 歌词插件
 
 对于 omarchy 4 / quickshell 用户，我们提供一个简单的顶部歌词插件：[lia.lines](https://github.com/chthollyphile/lia.lines)
@@ -49,28 +35,6 @@ https://omarchyplugins.com/plugin.html?id=lia.folia-lyrics
 
 
 
-### Hyprland / Wayland 遥控窗
-
-桌面端的外部遥控窗会作为主窗口的伴随窗口打开，并使用稳定窗口标题 `Folia Remote`。在 Hyprland 下，如果希望它以悬浮小窗方式出现，可以在 `hyprland.conf` 中添加类似规则：
-
-```ini
-windowrule {
-  name = folia-remote
-  float = on
-  size = 520 315
-  center = on
-  pin = on
-  no_blur = on
-  border_size = 0
-  no_shadow = on
-  match:class = ^(folia-major)$
-  match:title = ^(Folia Remote)$
-}
-
-```
-
-不同打包方式下窗口 `class` 可能不同；如果规则没有生效，可以用 `hyprctl clients` 查看实际 `class` / `title` 后再调整匹配条件。
-
 ## 部署与开发
 
 ### 后端 API
@@ -79,7 +43,7 @@ windowrule {
 
 如果使用前端版本的话，需要先自行部署该 API 服务。
 
-QQ 音乐是可选音源，由 npm 包 `@yakult-green-tea/qq-music-api` 提供。它需要一个常驻的 Node 进程（Docker 容器、裸 Node，或 Electron 主进程内嵌），因为原生扫码依赖 MQTT over WebSocket 长连线与进程内会话，暂不支持 Cloudflare Workers 与 Vercel Serverless。部署方式、环境变量、装置状态与 serverless 的完整说明见 [`deploy/docker/qq-api/README.md`](../deploy/docker/qq-api/README.md)。Web 版把 `VITE_QQ_API_BASE` 指向实例地址即可；Electron 版在主进程内直接启动该包，不需要单独部署。
+QQ 音乐是可选音源，由 npm 包 `@yakult-green-tea/qq-music-api` 提供。它需要一个常驻的 Node 进程（裸 Node，或 Electron 主进程内嵌），因为原生扫码依赖 MQTT over WebSocket 长连线与进程内会话，暂不支持 Cloudflare Workers 与 Vercel Serverless。Web 版把 `VITE_QQ_API_BASE` 指向实例地址即可；Electron 版在主进程内直接启动该包，不需要单独部署。
 
 ### AI 能力
 

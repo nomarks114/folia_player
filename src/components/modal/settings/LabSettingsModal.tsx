@@ -123,7 +123,6 @@ const LabSettingsModal: React.FC<LabSettingsModalProps> = ({
     const isVisualizerFrameRateLimiterEnabled = visualizerFrameRate !== 'off';
     const selectedVisualizerFrameRate = isVisualizerFrameRateLimiterEnabled ? visualizerFrameRate : 120;
     const selectedVisualizerFrameRateIndex = VISUALIZER_FRAME_RATE_OPTIONS.indexOf(selectedVisualizerFrameRate);
-    const isLinux = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('linux');
     const isElectron = typeof window !== 'undefined' && Boolean(window.electron);
 
     const handleNativeBlurToggle = () => {
@@ -389,19 +388,17 @@ const LabSettingsModal: React.FC<LabSettingsModalProps> = ({
                                     </div>
                                 )}
 
-                                {!isLinux && (
-                                    <div className={`flex items-center justify-between p-4 rounded-xl border transition-colors hover:bg-white/8 ${settingsCardInteractiveClass}`} onClick={handleNativeBlurToggle}>
-                                        <div className="flex flex-col pr-8">
-                                            <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                                                {t('options.enablePlayerPageNativeBlur')}
-                                            </span>
-                                            <span className="text-xs opacity-50 mt-1 max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>
-                                                {t('options.enablePlayerPageNativeBlurDesc')}
-                                            </span>
-                                        </div>
-                                        {renderToggle(enablePlayerPageNativeBlur, handleNativeBlurToggle)}
+                                <div className={`flex items-center justify-between p-4 rounded-xl border transition-colors hover:bg-white/8 ${settingsCardInteractiveClass}`} onClick={handleNativeBlurToggle}>
+                                    <div className="flex flex-col pr-8">
+                                        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                            {t('options.enablePlayerPageNativeBlur')}
+                                        </span>
+                                        <span className="text-xs opacity-50 mt-1 max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>
+                                            {t('options.enablePlayerPageNativeBlurDesc')}
+                                        </span>
                                     </div>
-                                )}
+                                    {renderToggle(enablePlayerPageNativeBlur, handleNativeBlurToggle)}
+                                </div>
 
                                 <button
                                     type="button"

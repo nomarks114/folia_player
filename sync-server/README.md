@@ -2,10 +2,9 @@
 
 这是 Folia 的官方同步服务端实现。本服务以“多端同构”为目标设计，底层逻辑完全一致。
 
-目前支持三种部署方案，你可以根据自己的需求任选其一：
+目前支持两种部署方案，你可以根据自己的需求任选其一：
 - **Cloudflare D1 / Workers 部署 (推荐)**: 免费、免运维、高可用，依托 Cloudflare 全球边缘网络。
-- **Docker 部署**: 适合有自己服务器或 VPS 的用户，一键启动，开箱即用。
-- **自托管部署 (Node.js)**: 使用 SQLite，适合在本地或不方便使用 Docker 的环境运行。
+- **自托管部署 (Node.js)**: 使用 SQLite，适合在本地运行。
 
 ## 🔐 Token 指南
 
@@ -90,11 +89,10 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 ```text
 1) Node (PM2)
-2) Docker
-3) Cloudflare Workers
+2) Cloudflare Workers
 ```
 
-输入 `3`，进入 Workers 部署流程。
+输入 `2`，进入 Workers 部署流程。
 
 ### 2. 按提示完成 Cloudflare 部署
 
@@ -213,40 +211,7 @@ npm run deploy:cf -- --config wrangler.local.toml
 
 ---
 
-## 方案二：Docker 部署
-
-Docker 资产已统一迁移到仓库的 `deploy/docker` 目录。完整 Web 堆栈与 HTTPS 说明见 [`deploy/docker/README.md`](../deploy/docker/README.md)；这里只保留 Sync Server 单独构建方式。
-
-### 1. 准备配置
-
-进入 Sync Server 目录并创建 `.env`：
-
-```bash
-cd sync-server
-touch .env
-```
-
-在同级目录下新建 `.env` 文件，配置 Token：
-
-```env
-# 必填：客户端鉴权 Token (至少 8 位)
-SYNC_TOKEN="你的_SYNC_TOKEN"
-
-# 选填：网页看板访问 Token (至少 16 位)
-DASHBOARD_TOKEN="你的_DASHBOARD_TOKEN"
-```
-
-### 2. 从仓库根目录启动服务
-
-```bash
-cd ..
-docker compose -f deploy/docker/compose.sync.yaml up -d --build
-```
-启动后，服务监听容器内的 `3000` 端口，并映射到宿主机的 `13000` 端口；数据库文件持久化在 `sync-server/data/folia-sync.db`。
-
----
-
-## 方案三：Node.js 自托管部署
+## 方案二：Node.js 自托管部署
 
 使用 Node.js 运行，底层使用 `better-sqlite3`。
 
@@ -280,7 +245,7 @@ npm install
 npm run start:node
 ```
 
-你可以使用 PM2 或 Docker 来进行持久化管理。
+你可以使用 PM2 来进行持久化管理。
 
 ---
 
@@ -318,7 +283,7 @@ http://127.0.0.1:13000
 - `src/node.ts`：Node server 与 SQLite 启动入口。
 - `src/cloudflare.ts`：Worker/D1 适配入口。
 - `src/d1-emulator.ts`：本地 Node 对 D1 风格存储的兼容层。
-- `install.sh` / `install.ps1`：Node、Docker、Cloudflare 三种部署菜单。
+- `install.sh` / `install.ps1`：Node、Cloudflare 两种部署菜单。
 
 当前协议约束：schema version 为 `1`，主题 manifest 固定为 `256` 个 bucket；主题批量写入上限为 `500`，bucket 请求最多 `32` 个，完整主题 list 最多 `1000` 条。修改这些限制或路由时必须同步客户端 `src/services/sync/*` 和本 README。
 

@@ -24,9 +24,8 @@ const createStore = () => {
 
 // Reversible test cipher: only the fake safeStorage sees plaintext; electron-store receives bytes
 // transformed before base64 encoding, matching the real ownership boundary without OS key access.
-const createSafeStorage = (backend = 'dpapi') => ({
+const createSafeStorage = () => ({
     isEncryptionAvailable: vi.fn(() => true),
-    getSelectedStorageBackend: vi.fn(() => backend),
     encryptString: vi.fn((plaintext: string): Buffer =>
         Buffer.from(Buffer.from(plaintext, 'utf8').map(byte => byte ^ 0xa5))),
     decryptString: vi.fn((ciphertext: Buffer) =>
@@ -180,29 +179,6 @@ describe('Electron KuGou API bridge', () => {
             cookie: expect.objectContaining({ token: 'secret-token', userid: '9' }),
         }));
         expect(restarted.getStatus()).toEqual({ available: true, authenticated: true, error: null });
-    });
-
-    it('removes legacy plaintext even when Linux only offers basic_text', async () => {
-        const store = createStore();
-        store.set(LEGACY_SESSION_KEY, { dfid: 'device', token: 'secret-token', userid: '9' });
-        const safeStorage = createSafeStorage('basic_text');
-        const warn = vi.fn();
-        const userDetail = vi.fn(async () => ({ body: { data: { nickname: 'Memory User' } }, cookie: [] }));
-        const bridge = createKugouApiBridge({
-            store,
-            safeStorage,
-            platform: 'linux',
-            warn,
-            apiLoader: () => ({ user_detail: userDetail }),
-        });
-
-        // The migrated session remains usable for this run, but is never written back unencrypted.
-        await expect(bridge.request('user_detail', {})).resolves.toMatchObject({
-            data: { nickname: 'Memory User', userid: '9' },
-        });
-        expect(store.get(LEGACY_SESSION_KEY)).toBeUndefined();
-        expect(store.get(SESSION_KEY)).toBeUndefined();
-        expect(warn).toHaveBeenCalledWith('[KuGouSession] save-failed', { name: 'Error' });
     });
 
 });

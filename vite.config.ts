@@ -188,8 +188,6 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
 
   const appVersionLabel = process.env.APP_VERSION_LABEL?.trim() || 'Realeco';
   const appReleaseChannel = process.env.APP_RELEASE_CHANNEL?.trim().toLowerCase() || 'realeco';
-  const dockerStackVersion = process.env.DOCKER_STACK_VERSION?.trim() || '';
-
   return {
     base: process.env.ELECTRON === 'true' ? './' : '/',
     worker: {
@@ -226,7 +224,6 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 5000000,
-          // Docker serves this file dynamically; it must never be pinned in the PWA precache.
           globIgnores: ['**/runtime-config.js']
         },
         manifest: {
@@ -253,7 +250,6 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       '__APP_VERSION__': JSON.stringify(JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')).version),
       '__APP_VERSION_LABEL__': JSON.stringify(appVersionLabel),
       '__APP_RELEASE_CHANNEL__': JSON.stringify(appReleaseChannel),
-      '__DOCKER_STACK_VERSION__': JSON.stringify(dockerStackVersion)
     },
     resolve: {
       alias: {

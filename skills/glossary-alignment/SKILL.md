@@ -80,7 +80,6 @@ description: Use when the user refers to repository-specific terms such as home 
 - “IndexedDB / 主题、封面、二进制缓存” -> `src/services/db.ts`、`appDatabase.ts`、`repositories/*`、`binaryAssetStore.ts`、`coverCache.ts`、`themeCache.ts`。
 - “Electron 主进程 / API bridge” -> `electron/main.cjs`、`preload.cjs`、`stageApi.cjs`、`kugouApiBridge.cjs`、`updateChannels.cjs`；Web API 源码在 `api/`、`api-ts/`。
 - “Sync Server” -> `sync-server/src/app.ts`（路由/协议）、`src/node.ts`、`src/cloudflare.ts`、`src/d1-emulator.ts`；Worker 包装入口是 `worker/index.ts`。
-- “Docker Web stack” -> `deploy/docker/compose.yaml`、`compose.sync.yaml`、`compose.build.yaml`、`scripts/smoke-test.sh`。
 
 ## Fast lookup rules
 

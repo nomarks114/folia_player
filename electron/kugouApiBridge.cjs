@@ -49,21 +49,14 @@ const randomUpperHex = (bytes) => crypto.randomBytes(bytes).toString('hex').toUp
 const isRecord = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * Electron may expose Linux's `basic_text` password backend as available even though it only
- * obfuscates data. Refusing it keeps KuGou account tokens out of Folia's plaintext config file.
+ * Ensures Electron safeStorage encryption is available before persisting credentials.
  */
-function assertEncryptionAvailable(safeStorage, platform) {
+function assertEncryptionAvailable(safeStorage) {
   if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function') {
     throw new Error('Electron safeStorage is unavailable');
   }
   if (!safeStorage.isEncryptionAvailable()) {
     throw new Error('Electron safeStorage encryption is unavailable');
-  }
-  const backend = platform === 'linux' && typeof safeStorage.getSelectedStorageBackend === 'function'
-    ? safeStorage.getSelectedStorageBackend()
-    : null;
-  if (backend === 'basic_text') {
-    throw new Error('Electron safeStorage selected the unencrypted basic_text backend');
   }
 }
 
@@ -71,7 +64,7 @@ function assertEncryptionAvailable(safeStorage, platform) {
  * Stores one encrypted cookie map. Failures deliberately degrade to the bridge's in-memory copy:
  * login keeps working for the current run, but no credential is written without OS encryption.
  */
-function createSessionPersistence({ store, safeStorage, platform, warn }) {
+function createSessionPersistence({ store, safeStorage, warn }) {
   const remove = key => {
     if (typeof store.delete === 'function') store.delete(key);
     else store.set(key, undefined);
@@ -85,7 +78,7 @@ function createSessionPersistence({ store, safeStorage, platform, warn }) {
       const encoded = store.get(SESSION_KEY);
       if (typeof encoded === 'string' && encoded.length > 0) {
         try {
-          assertEncryptionAvailable(safeStorage, platform);
+          assertEncryptionAvailable(safeStorage);
           const plaintext = safeStorage.decryptString(Buffer.from(encoded, 'base64'));
           const envelope = JSON.parse(plaintext);
           if (
@@ -110,7 +103,7 @@ function createSessionPersistence({ store, safeStorage, platform, warn }) {
     },
     save(cookies) {
       try {
-        assertEncryptionAvailable(safeStorage, platform);
+        assertEncryptionAvailable(safeStorage);
         const plaintext = JSON.stringify({
           version: SESSION_ENVELOPE_VERSION,
           cookies,
@@ -156,7 +149,6 @@ const isDeviceVerificationRequired = (body) => {
 function createKugouApiBridge({
   store,
   safeStorage,
-  platform = process.platform,
   warn = console.warn,
   apiLoader = () => require('kugoumusicapi'),
 }) {
@@ -164,7 +156,7 @@ function createKugouApiBridge({
   let loadError = null;
   let registrationPromise = null;
   let cookies = null;
-  const persistence = createSessionPersistence({ store, safeStorage, platform, warn });
+  const persistence = createSessionPersistence({ store, safeStorage, warn });
 
   // The bridge is constructed before Electron's ready event, while safeStorage cannot be used yet.
   // Loading lazily on the first IPC call guarantees OS encryption is initialized before migration.

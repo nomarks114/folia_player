@@ -109,7 +109,7 @@ function createVoiceInputPauseMonitor(options = {}) {
   const isEnabled = typeof options.isEnabled === 'function' ? options.isEnabled : () => false;
   const getOwnExePath = typeof options.getOwnExePath === 'function' ? options.getOwnExePath : () => '';
   const queryInUse = typeof options.queryInUse === 'function' ? options.queryInUse : queryWindowsMicrophoneInUse;
-  const isSupported = typeof options.isSupported === 'boolean' ? options.isSupported : process.platform === 'win32';
+  const isSupported = typeof options.isSupported === 'boolean' ? options.isSupported : true;
   const pollIntervalMs = Number.isFinite(options.pollIntervalMs) ? Math.max(200, options.pollIntervalMs) : DEFAULT_POLL_INTERVAL_MS;
 
   let timer = null;

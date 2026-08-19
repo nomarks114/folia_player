@@ -27,9 +27,8 @@ print_sync_token_reminder() {
 
 echo -e "${BOLD}请选择部署方式：${RESET}"
 echo -e "  ${YELLOW}1)${RESET} Node (PM2)"
-echo -e "  ${YELLOW}2)${RESET} Docker"
-echo -e "  ${YELLOW}3)${RESET} Cloudflare Workers"
-echo -ne "${BOLD}请输入选项 [1-3]: ${RESET}"
+echo -e "  ${YELLOW}2)${RESET} Cloudflare Workers"
+echo -ne "${BOLD}请输入选项 [1-2]: ${RESET}"
 read deploy_choice
 
 echo ""
@@ -136,39 +135,6 @@ case $deploy_choice in
         print_sync_token_reminder "$local_sync_token"
         ;;
     2)
-        echo -e "${CYAN}[*] 开始进行 Docker 部署...${RESET}"
-        
-        if ! command -v docker &> /dev/null
-        then
-            echo -e "${RED}[!] 未检测到 Docker 环境。请先手动安装 Docker。${RESET}"
-            exit 1
-        fi
-        
-        setup_env_token
-        
-        echo -e "${CYAN}[*] 正在构建并启动 Docker 容器...${RESET}"
-        if docker compose version &> /dev/null; then
-            docker compose -f ../deploy/docker/compose.sync.yaml up -d --build
-        elif docker-compose --version &> /dev/null; then
-            docker-compose -f ../deploy/docker/compose.sync.yaml up -d --build
-        else
-            echo -e "${RED}[!] 未检测到 docker compose 或 docker-compose 插件。${RESET}"
-            exit 1
-        fi
-        
-        echo -e "${GREEN}${BOLD}==========================================${RESET}"
-        echo -e "${GREEN}${BOLD}    部署完成！                            ${RESET}"
-        echo -e "${GREEN}${BOLD}==========================================${RESET}"
-        echo -e "${CYAN}你的同步服务端已映射到本地 13000 端口（容器内 3000）。${RESET}"
-        echo -e "使用此命令查看日志： ${BOLD}docker logs -f folia-sync${RESET}"
-        
-        local_sync_token=""
-        if [ -f .env ]; then
-            local_sync_token=$(grep '^SYNC_TOKEN=' .env | cut -d '=' -f2-)
-        fi
-        print_sync_token_reminder "$local_sync_token"
-        ;;
-    3)
         echo -e "${CYAN}[*] 开始进行 Cloudflare Workers 部署...${RESET}"
         
         # Check if NPM is installed

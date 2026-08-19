@@ -86,7 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest]
 
     steps:
       - name: Check out Git repository
@@ -125,15 +125,10 @@ jobs:
         with:
           name: ${{ needs.prepare.outputs.release_tag }}-${{ matrix.os }}
           path: |
-            release/*.dmg
-            release/*.zip
             release/*.exe
             release/*.blockmap
             release/*.yml
             !release/builder-debug.yml
-            release/*.deb
-            release/*.rpm
-            release/*.tar.gz
           if-no-files-found: error
           retention-days: 14
 

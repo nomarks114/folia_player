@@ -6,12 +6,6 @@ on:
     paths:
       - realeco-release
   workflow_dispatch:
-    inputs:
-      publish_aur_only:
-        description: 'Skip desktop builds and only publish the AUR package'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -90,7 +84,7 @@ jobs:
   prepare-release:
     name: Prepare Realeco draft
     needs: validate-release
-    if: needs.validate-release.outputs.should_build == 'true' && github.event.inputs.publish_aur_only != 'true'
+    if: needs.validate-release.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -110,12 +104,12 @@ jobs:
   build:
     name: Build Realeco on ${{ matrix.os }}
     needs: [validate-release, prepare-release]
-    if: needs.validate-release.outputs.should_build == 'true' && github.event.inputs.publish_aur_only != 'true'
+    if: needs.validate-release.outputs.should_build == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest]
 
     steps:
       - name: Check out Git repository
@@ -142,7 +136,6 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
           RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
-          MACOS_UNSIGNED_HELP_URL: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/desktop/macos-app-damaged.md
         run: |
           node <<'NODE'
           const fs = require('fs');
@@ -150,7 +143,6 @@ jobs:
           const replacements = {
             VERSION: process.env.RELEASE_VERSION,
             TAG: process.env.RELEASE_TAG,
-            MACOS_UNSIGNED_HELP_URL: process.env.MACOS_UNSIGNED_HELP_URL,
           };
           const notes = Object.entries(replacements).reduce((text, [key, value]) => text.split(`{{${key}}}`).join(value || ''), template);
           fs.mkdirSync('build', { recursive: true });
@@ -174,15 +166,10 @@ jobs:
         with:
           name: realeco-${{ matrix.os }}
           path: |
-            release/*.dmg
-            release/*.zip
             release/*.exe
             release/*.blockmap
             release/*.yml
             !release/builder-debug.yml
-            release/*.deb
-            release/*.rpm
-            release/*.tar.gz
             build/release-notes.md
           if-no-files-found: error
           retention-days: 14
@@ -190,7 +177,7 @@ jobs:
   publish-release:
     name: Publish Realeco draft
     needs: [validate-release, build]
-    if: needs.validate-release.outputs.should_build == 'true' && github.event.inputs.publish_aur_only != 'true'
+    if: needs.validate-release.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -214,65 +201,4 @@ jobs:
             gh release create "${RELEASE_TAG}" "${files[@]}" --repo "${GITHUB_REPOSITORY}" --title "Realeco ${RELEASE_TAG}" --notes-file "${NOTES_FILE}" --target "${GITHUB_SHA}" --draft
           fi
 
-  publish-aur:
-    name: Publish AUR package
-    needs: validate-release
-    if: needs.validate-release.outputs.version_valid == 'true'
-    runs-on: ubuntu-latest
 
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v6
-
-      - name: Check AUR secrets
-        id: aur-secrets
-        shell: bash
-        env:
-          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          AUR_REPO_SSH_URL: ${{ secrets.AUR_REPO_SSH_URL }}
-        run: |
-          if [[ -z "${AUR_SSH_PRIVATE_KEY}" || -z "${AUR_REPO_SSH_URL}" ]]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Prepare AUR metadata
-        if: steps.aur-secrets.outputs.configured == 'true'
-        run: ./packaging/aur/folia-major-bin/update.sh "${{ needs.validate-release.outputs.version }}"
-
-      - name: Set up SSH key
-        if: steps.aur-secrets.outputs.configured == 'true'
-        shell: bash
-        run: |
-          install -dm700 ~/.ssh
-          printf '%s\n' "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/aur
-          chmod 600 ~/.ssh/aur
-          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<'EOF'
-          Host aur.archlinux.org
-            IdentityFile ~/.ssh/aur
-            IdentitiesOnly yes
-          EOF
-
-      - name: Push package to AUR
-        if: steps.aur-secrets.outputs.configured == 'true'
-        shell: bash
-        env:
-          AUR_REPO_SSH_URL: ${{ secrets.AUR_REPO_SSH_URL }}
-          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
-        run: |
-          git clone "${AUR_REPO_SSH_URL}" aur-repo
-          cp packaging/aur/folia-major-bin/PKGBUILD aur-repo/PKGBUILD
-          cp packaging/aur/folia-major-bin/.SRCINFO aur-repo/.SRCINFO
-          cp packaging/aur/folia-major-bin/folia-major.desktop aur-repo/folia-major.desktop
-          cp packaging/aur/folia-major-bin/folia-major.png aur-repo/folia-major.png
-          cd aur-repo
-          if git diff --quiet -- PKGBUILD .SRCINFO folia-major.desktop folia-major.png; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add PKGBUILD .SRCINFO folia-major.desktop folia-major.png
-          git commit -m "Update to v${RELEASE_VERSION}"
-          git push

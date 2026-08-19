@@ -29,7 +29,7 @@ description: Use when the repository area is unfamiliar, the user describes a fe
 | IndexedDB、主题/歌曲缓存 | `src/services/db.ts` / `appDatabase.ts` | `repositories/*`、`binaryAssetStore.ts`、`coverCache.ts`、`themeCache.ts` |
 | R2/同步客户端 | `src/services/sync/syncCoordinator.ts` | `syncClient.ts`、`syncRepository.ts`、`sync/settingsSnapshot.ts`、`themeSyncRegistry.ts` |
 | 服务端同步 API | `sync-server/src/app.ts` | `src/node.ts`、`src/cloudflare.ts`、`src/d1-emulator.ts`、`worker/index.ts` |
-| Vercel / 音乐 API bridge / Electron | `api/`、`api-ts/`、`electron/main.cjs` | `electron/{preload,stageApi,kugouApiBridge}.cjs`、`shared/*`、`deploy/docker/*` |
+| Vercel / 音乐 API bridge / Electron | `api/`、`api-ts/`、`electron/main.cjs` | `electron/{preload,stageApi,kugouApiBridge}.cjs`、`shared/*` |
 
 ## Current mode and surface names
 

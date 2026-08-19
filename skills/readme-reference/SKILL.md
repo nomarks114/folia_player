@@ -14,9 +14,8 @@ README 是导航线索，不是代码真相。先按任务读取相关小片段�
 - visualizer 共享入口、模式、背景、性能约定：`src/components/visualizer/README.md`。
 - Partita layout、sticky punctuation、预热和缓存：`src/components/visualizer/partita/README.md`。
 - 在线歌曲 Omni/provider 边界：`src/services/onlineMusic/README.md` + `src/services/onlineMusic/omni.ts`。
-- 同步 API、Node/Cloudflare/Docker 部署：`sync-server/README.md`。
-- Docker Web stack、端口、环境变量和 smoke test：`deploy/docker/README.md`。
-- Linux 便携包和 Electron 图形模式：`packaging/linux/README-LINUX.txt` + `electron/main.cjs`。
+- 同步 API、Node/Cloudflare 部署：`sync-server/README.md`。
+- Linux 便携包和 Electron 图形模式：`electron/main.cjs`。
 - Cappella 内置头像/表情资源：相邻 `cappella/avatar/README.md` 或 `emo/README.md`，只在涉及这些资源时读取。
 - `test/manual/**/README.md` 属于测试/联调文档；按“排除测试文件”的任务要求不要把它们当作生产架构依据。
 
@@ -25,10 +24,10 @@ README 是导航线索，不是代码真相。先按任务读取相关小片段�
 先用 `rg -n` 搜标题、脚本名、当前符号或路径，再打开命中位置附近 20-80 行。不要为了保险全文读取长 README。
 
 ```powershell
-rg -n "components/app|services/|visualizer|scripts|部署|Node|Docker" src/README.md README.md
+rg -n "components/app|services/|visualizer|scripts|部署|Node" src/README.md README.md
 rg -n "VisualizerRenderer|registry|pendolo|sonnet|background" src/components/visualizer/README.md
 rg -n "Omni|provider|lyrics|playback|catalog" src/services/onlineMusic/README.md
-rg -n "Node|/health|/settings|/themes|compose" sync-server/README.md deploy/docker/README.md
+rg -n "Node|/health|/settings|/themes" sync-server/README.md
 ```
 
 ## Verification protocol

@@ -53,7 +53,7 @@ export const generateThemeFromLyrics = async (
 
 // The AI connection the web OBS overlay (Dynamic AI mode) generates a theme with. The overlay runs
 // in a separate browser context, so it takes an explicit provider instead of reading anything from
-// the app; the provider is selected by Docker runtime config or the Vite build fallback.
+// the app; the provider is selected by runtime config or the Vite build fallback.
 export interface ObsAiConfig {
   provider: 'gemini' | 'openai';
 }
