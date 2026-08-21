@@ -3,30 +3,60 @@
 </p>
 
 <div align="center">
-<a href="https://trendshift.io/repositories/71740?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-71740" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/71740" alt="chthollyphile%2Ffolia-major | Trendshift" width="250" height="55"/></a>
 
-# Folia(修改版)
+# Folia (修改版)
+
+> **本仓库是 [chthollyphile/folia-major](https://github.com/chthollyphile/folia-major) 的 Fork。**
+> 以下「本 Fork 的更改」章节描述了相对于上游的独有修改，其余内容均来自原仓库。
 
 Lyrics Reimagined // 辞曲新境
 
-[![GitHub release](https://img.shields.io/github/v/release/chthollyphile/folia-major?label=release)](https://github.com/chthollyphile/folia-major/releases)
-[![License](https://img.shields.io/github/license/chthollyphile/folia-major)](https://github.com/chthollyphile/folia-major/blob/main/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/chthollyphile/folia-major?style=social)](https://github.com/chthollyphile/folia-major/stargazers)
+[![GitHub release](https://img.shields.io/github/v/release/nomarks114/folia_player?label=release)](https://github.com/nomarks114/folia_player/releases)
+[![License](https://img.shields.io/github/license/nomarks114/folia_player)](https://github.com/nomarks114/folia_player/blob/main/LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/chthollyphile/folia-major)
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-35-orange.svg?style=flat-square)](CONTRIBUTORS.md)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
-[获取方式](https://github.com/chthollyphile/folia-major#%E8%8E%B7%E5%8F%96%E6%96%B9%E5%BC%8F)
+[上游原仓库](https://github.com/chthollyphile/folia-major)
 ·
-[Vercel 部署](https://vercel.com/new/clone?repository-url=https://github.com/chthollyphile/folia-major)
+[获取方式](#获取方式)
 ·
 [使用指南](https://folia-site.cielaniska.top/guide/)
 ·
 [技术说明](docs/technical.md)
 
 </div>
+
+---
+
+## 本 Fork 的更改
+
+相对于上游 [chthollyphile/folia-major](https://github.com/chthollyphile/folia-major)，本 Fork 包含以下独有修改：
+
+### Sonnet 可视化增强
+
+- **镜头过渡方向联动**：镜头退出方向跟随相机平移方向，使过渡更自然
+- **Fragment-collage 概览提升**：在镜头最后 30% 加入平滑缩放效果
+- **入场延迟支持**：新增 `entryDelay` 属性，支持逐字延迟入场
+- **新增 shot 类型与布局**：扩展 `sonnetShotFlowLayouts`、新增 `sonnetShotMg` 模块
+- **增强过渡动画**：扩展 `sonnetTransitions`，支持更多过渡效果
+- **排版角色与布局增强**：扩展 `sonnetTypographyRoles` 和 `sonnetTypographyLayout`
+
+### Windows 构建配置
+
+- 新增 **Portable** 构建目标（x64），与 NSIS 安装包并存
+- 图标格式从 `icon.png` 改为 `icon.ico`
+- 新增 `build-electron.cjs`：绕过 SSL 证书验证的构建脚本（适用于企业代理环境）
+
+### 其他
+
+- **歌词代理白名单**：移除 `kgimg.com` 域名
+- **开发快捷键**：调试叠加层快捷键从 `Alt+Shift+D` 改为 `Ctrl+Shift+D`
+- **Fork 版本号**：`v0.6.21a`
+
+---
+
+以下内容来自原仓库 [chthollyphile/folia-major](https://github.com/chthollyphile/folia-major)。
+
+---
 
 ## 项目简介
 
@@ -87,7 +117,7 @@ https://github.com/user-attachments/assets/704f195a-2194-434b-86e8-8f36290e5cc4
     <td align="center"><strong>群唱</strong></td>
     <td align="center"><strong>倾诉</strong></td>
   </tr>
-    <tr>
+  <tr>
     <td width="50%">
       <img src="./img/preview-diorama.png" alt="镜台 主题预览" />
     </td>
@@ -143,8 +173,7 @@ https://github.com/user-attachments/assets/704f195a-2194-434b-86e8-8f36290e5cc4
 - **Arch Linux**: 可通过 AUR 获取 [folia-major-bin](https://aur.archlinux.org/packages/folia-major-bin)。
 - **Flatpak**: 社区提供的第三方 flatpak，详情见 [Flatpark](https://flatpark.org/apps/top.izuna.foliamajor/)。
 
-> [!IMPORTANT]
-> 如果国内网络从 GitHub Releases 下载较慢，可以使用 [夸克网盘](https://pan.quark.cn/s/6e4c6fa3bc6f) 或 [百度云](https://pan.baidu.com/s/1f0x3g-8PMcNCO-TJ5z1rPw?pwd=flia) 下载。网盘链接仅提供 Windows 与 Apple silicon 的正式版安装包.
+
 
 Linux 包、Wayland / Hyprland 遥控窗和桌面端细节见 [技术与开发说明](docs/technical.md)。
 
@@ -165,7 +194,7 @@ Folia 提供了可选的官方同步服务端 `sync-server`，用于在多个设
 - **Docker**：镜像与 Compose 入口见 [Docker 部署目录](deploy/docker/README.md)。
 - **Node.js 自托管**：使用 SQLite，适合本地或不方便使用 Docker 的环境。
 
-详细的环境变量、Token 配置与部署步骤请参阅 [Sync-Server 部署指南](https://folia-site.cielaniska.top/guide/deploy-sync)。部署完成后，在 Folia 的“存储设置”中填写服务端地址和 `SYNC_TOKEN` 即可启用同步。
+详细的环境变量、Token 配置与部署步骤请参阅 [Sync-Server 部署指南](https://folia-site.cielaniska.top/guide/deploy-sync)。部署完成后，在 Folia 的"存储设置"中填写服务端地址和 `SYNC_TOKEN` 即可启用同步。
 
 ## 本地音乐与匹配说明
 
