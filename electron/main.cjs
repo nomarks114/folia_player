@@ -2,10 +2,12 @@ const { app, BrowserWindow, ipcMain, session, screen, dialog, shell, nativeImage
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { spawn } = require('child_process');
 const Store = require('electron-store').default || require('electron-store');
 const crypto = require('crypto');
 const { createStageApi } = require('./stageApi.cjs');
 const { createWindowPlaybackHandoffStore } = require('./windowPlaybackHandoff.cjs');
+const wallpaperWatchdogModule = require('./wallpaperWatchdog.cjs');
 const { createKugouApiBridge } = require('./kugouApiBridge.cjs');
 const { createQqAuthSessionRepository } = require('./qqAuthSessionRepository.cjs');
 const { DEFAULT_DISCORD_APPLICATION_ID, createDiscordPresenceController } = require('./discordPresence.cjs');
@@ -14,6 +16,7 @@ const { createDisplaySleepBlocker } = require('./displaySleepBlocker.cjs');
 const { createLyricApi } = require('./lyricApi.cjs');
 const { createLocalCoverAssetStore, getLocalCoverAssetDirectory } = require('./localCoverAssets.cjs');
 const { getReleaseUrl, getUpdateProviderConfig, resolveReleaseChannel } = require('./updateChannels.cjs');
+const { resolveLinuxPasswordStore } = require('./linuxPasswordStore.cjs');
 const { sanitizeDualTheme: sanitizeGeneratedDualTheme } = require('../shared/themeSanitizer.cjs');
 const useLinuxGraphicsDebugMode = process.env.ELECTRON_LINUX_PACKAGED_GRAPHICS === 'true';
 const isAppImageRuntime =
@@ -59,6 +62,13 @@ app.on('certificate-error', (event, _webContents, requestUrl, error, _certificat
 
 // Fix for Arch Linux / Wayland & Vulkan compatibility issues
 if (process.platform === 'linux') {
+  // Must run before the ready event: Chromium reads the password backend once while initialising
+  // OSCrypt, and the default detection leaves unrecognised desktops without any real encryption.
+  const linuxPasswordStore = resolveLinuxPasswordStore();
+  if (linuxPasswordStore) {
+    app.commandLine.appendSwitch('password-store', linuxPasswordStore);
+  }
+
   app.commandLine.appendSwitch('disable-vulkan');
   app.commandLine.appendSwitch('disable-features', 'Vulkan');
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -91,6 +101,184 @@ const store = new Store({ projectName: 'Folia' });
 // The bridge refuses Linux's plaintext `basic_text` fallback and degrades to an in-memory session.
 const kugouApiBridge = createKugouApiBridge({ store, safeStorage });
 const qqAuthSessionRepository = createQqAuthSessionRepository({ store, safeStorage });
+
+// --- Desktop wallpaper mode (Wayland layer-shell via windowtolayer / X11 desktop window) ---
+// Settings keys follow the existing electron-store key/value chain; values are normalized here in
+// the main process so stale or dirty stored values never reach the windowtolayer CLI.
+const WALLPAPER_MODE_SETTING_KEY = 'wallpaper_mode';
+
+// Thin wrappers over electron/wallpaperWatchdog.cjs so the call sites across the file keep their
+// existing signatures while the predicates stay a single source of truth in the module.
+function isWallpaperModeEnabled() {
+  return wallpaperWatchdogModule.isWallpaperModeEnabled(store);
+}
+
+// X11 wallpaper mode: the main window is a _NET_WM_WINDOW_TYPE_DESKTOP window. It shares the
+// desktop layer with the KDE desktop window, and because desktop windows are rendered unredirected
+// there is no composited backdrop behind them. Click-through is therefore unavailable there: it
+// would let clicks reach the KDE desktop window, which KWin then raises above Folia (both are
+// desktop-type, the topmost wins), covering the wallpaper.
+function isX11WallpaperMode() {
+  return wallpaperWatchdogModule.isX11WallpaperMode({
+    platform: process.platform,
+    env: process.env,
+    store,
+  });
+}
+
+// The wrapped child keeps FOLIA_WRAPPED_BY_WINDOWTOLAYER=1; it must never wrap itself again.
+function isWallpaperWrapped() {
+  return wallpaperWatchdogModule.isWallpaperWrapped(process.env);
+}
+
+// The binary ships as resources/windowtolayer (built by packaging/linux/build-windowtolayer.mjs).
+// FOLIA_WINDOWTOLAYER_PATH overrides it for non-packaged (dev) runs; the dev:electron* scripts
+// inject `build/windowtolayer` (produced by `npm run build:windowtolayer`) so wallpaper mode also
+// works outside an electron-builder package. A missing binary just disables wallpaper mode.
+function resolveWindowToLayerPath() {
+  const override = process.env.FOLIA_WINDOWTOLAYER_PATH;
+  if (override) {
+    return fs.existsSync(override) ? override : null;
+  }
+  const candidate = path.join(process.resourcesPath, 'windowtolayer');
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
+// Enables wallpaper mode on Wayland: spawn windowtolayer wrapping a fresh Folia child, then the
+// old process exits once the wrapper has spawned. Spawn failure (ENOENT/EACCES) arrives on the
+// async 'error' event, never as a synchronous throw, so we revert the setting instead of crashing.
+function launchWrappedSelf({ onError } = {}) {
+  const wtl = resolveWindowToLayerPath();
+  if (!wtl) {
+    console.warn('[Wallpaper] windowtolayer missing, cannot enable wallpaper mode');
+    store.set(WALLPAPER_MODE_SETTING_KEY, false);
+    onError?.(new Error('windowtolayer binary is missing'));
+    return Promise.resolve('missing');
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn(wtl, ['--layer=bottom', '--interactivity=all',
+      process.execPath, ...process.argv.slice(1)],
+      {
+        env: { ...process.env, FOLIA_WRAPPED_BY_WINDOWTOLAYER: '1', FOLIA_RELAUNCH: '1' },
+        stdio: 'inherit',
+      });
+    child.once('error', (err) => {
+      console.error('[Wallpaper] windowtolayer spawn failed, reverting wallpaper mode', err);
+      store.set(WALLPAPER_MODE_SETTING_KEY, false);
+      onError?.(err);
+      resolve('error');
+    });
+    child.once('spawn', () => {
+      resolve('spawned');
+      app.exit(0);
+    });
+  });
+}
+
+// Watchdog: liveness probe + recovery-to-normal-window live in electron/wallpaperWatchdog.cjs
+// (dependency-injected here so the same logic is unit-testable and simulatable headless).
+const wallpaperWatchdog = wallpaperWatchdogModule.createWallpaperWatchdog({
+  store,
+  env: process.env,
+  spawnFn: spawn,
+  execPath: () => process.execPath,
+  argv: () => process.argv.slice(1),
+  getPpid: () => process.ppid,
+  exit: (code) => app.exit(code),
+  killFn: process.kill.bind(process),
+  probeIntervalMs: 2000,
+});
+
+// Runtime change (save-settings IPC): relaunch the whole process so the new mode takes effect.
+// The store value is already written by the save-settings handler before this runs.
+function relaunchForWallpaperModeChange(nextEnabled) {
+  if (nextEnabled) {
+    if (isWallpaperWrapped()) {
+      return; // already a wallpaper session, nothing to do
+    }
+    if (Boolean(process.env.WAYLAND_DISPLAY)) {
+      void launchWrappedSelf({
+        onError: () => {
+          setMainWindowClickThroughEnabled(false);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('wallpaper-mode-changed', getPublicSettings());
+          }
+        },
+      });
+    } else {
+      wallpaperWatchdog.relaunchSelfNormal(); // X11: plain relaunch; the fresh window picks up type:'desktop'
+    }
+  } else {
+    wallpaperWatchdog.relaunchSelfNormal();
+  }
+}
+
+// Coalesce rapid UI toggles into one relaunch. The generation check also prevents a stale
+// handoff request from launching an older mode after the user changes the switch again.
+function scheduleWallpaperModeRelaunch(nextEnabled) {
+  wallpaperModeRelaunchGeneration += 1;
+  const generation = wallpaperModeRelaunchGeneration;
+  if (wallpaperModeRelaunchTimer) {
+    clearTimeout(wallpaperModeRelaunchTimer);
+  }
+
+  wallpaperModeRelaunchTimer = setTimeout(async () => {
+    wallpaperModeRelaunchTimer = null;
+    await requestWindowPlaybackHandoff();
+    if (generation !== wallpaperModeRelaunchGeneration) {
+      return;
+    }
+    relaunchForWallpaperModeChange(nextEnabled);
+  }, 300);
+}
+
+// Startup wrapper: only the main process reaches main.cjs (GPU/renderer children start with
+// --type=... and exit before this). The jumpboard takes the single-instance lock before spawning
+// windowtolayer; the wrapped child uses FOLIA_RELAUNCH to retry after the jumpboard exits.
+const wallpaperMode = isWallpaperModeEnabled();
+const onWayland = Boolean(process.env.WAYLAND_DISPLAY);
+
+// Serializes ownership, wrapper launch, and crash-loop accounting.
+async function prepareMainProcessStartup() {
+  const gotSingleInstanceLock = await acquireSingleInstanceLock();
+  if (!gotSingleInstanceLock) {
+    return 'duplicate';
+  }
+
+  app.on('second-instance', () => {
+    focusMainWindow();
+  });
+
+  if (isWallpaperWrapped()) {
+    wallpaperWatchdog.recordWrappedLaunch();
+    wallpaperWatchdog.startParentLivenessProbe({ parentPid: process.ppid });
+    return 'ready';
+  }
+
+  if (!wallpaperMode || !onWayland) {
+    wallpaperWatchdog.resetWrappedCrashCount();
+    return 'ready';
+  }
+
+  if (wallpaperWatchdog.shouldDisableWallpaperMode()) {
+    // Repeated wrapped sessions crashed before the watchdog could fire; turn the mode off and
+    // run as a plain window this time instead of re-entering the wrap loop.
+    console.warn('[Wallpaper] repeated wrapped crashes, disabling wallpaper mode');
+    store.set(WALLPAPER_MODE_SETTING_KEY, false);
+    wallpaperWatchdog.resetWrappedCrashCount();
+    return 'fallback';
+  }
+
+  const wrapperResult = await launchWrappedSelf();
+  if (wrapperResult !== 'spawned') {
+    wallpaperWatchdog.resetWrappedCrashCount();
+    return 'fallback';
+  }
+  return wrapperResult;
+}
+
+const mainProcessStartupPromise = prepareMainProcessStartup();
 
 // --- Electron main process locale map ---
 const APP_LOCALE_KEY = 'APP_LOCALE';
@@ -130,12 +318,62 @@ const mainLocale = {
   },
 };
 
+// Maps an arbitrary BCP 47 tag onto one of the three locales the main process ships.
+// Returns null for unsupported tags so callers can keep walking the preference list.
+function normalizeMainLocaleKey(value) {
+  if (typeof value !== 'string' || !value) {
+    return null;
+  }
+
+  const lowered = value.toLowerCase();
+  if (lowered === 'in' || lowered.startsWith('id')) {
+    return 'in';
+  }
+  if (lowered.startsWith('zh')) {
+    return 'zh-CN';
+  }
+  if (lowered.startsWith('en')) {
+    return 'en';
+  }
+  return null;
+}
+
+// Used before the renderer has ever pushed APP_LOCALE, so a fresh install shows
+// tray and dialog text in the system language instead of hard-defaulting to English.
+// Both Electron locale APIs require `ready`, which every caller here is past.
+function detectSystemLocaleKey() {
+  const candidates = [];
+
+  if (typeof app.getPreferredSystemLanguages === 'function') {
+    try {
+      candidates.push(...app.getPreferredSystemLanguages());
+    } catch (error) {
+      console.warn('[Electron] Failed to read preferred system languages', error);
+    }
+  }
+
+  try {
+    candidates.push(app.getLocale());
+  } catch (error) {
+    console.warn('[Electron] Failed to read app locale', error);
+  }
+
+  for (const candidate of candidates) {
+    const normalized = normalizeMainLocaleKey(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return 'en';
+}
+
 function getMainLocale() {
   const stored = store.get(APP_LOCALE_KEY);
   if (stored === 'zh-CN' || stored === 'en' || stored === 'in') {
     return mainLocale[stored];
   }
-  return mainLocale.en;
+  return mainLocale[detectSystemLocaleKey()];
 }
 
 
@@ -151,16 +389,25 @@ const obsBrowserSourceClients = new Set();
 let remoteControlAlwaysOnTop = false;
 let remoteControlSkipTaskbarEnabled = false;
 let mainWindowAlwaysOnTop = false;
-let mainWindowClickThroughEnabled = false;
+// Click-through follows wallpaper mode on Wayland only; X11 wallpaper mode must keep it off (see
+// isX11WallpaperMode).
+let mainWindowClickThroughEnabled = isWallpaperModeEnabled() && Boolean(process.env.WAYLAND_DISPLAY);
 let mainWindowClickThroughUnlockHover = false;
 let mainWindowClickThroughUnlockHoverTimer = null;
 let mainWindowSkipTaskbarEnabled = false;
 let videoExportWindowRestoreState = null;
 let autoUpdater = null;
-const windowPlaybackHandoffStore = createWindowPlaybackHandoffStore();
+// Backed by the settings store so a handoff survives a full process relaunch (wallpaper mode)
+const windowPlaybackHandoffStore = createWindowPlaybackHandoffStore({
+  storage: store,
+  ttlMs: 60_000,
+});
 const pendingWindowPlaybackHandoffRequests = new Map();
 let pendingWindowStateSave = null;
 let windowStateSaveTimer = null;
+let wallpaperModeRelaunchTimer = null;
+let wallpaperModeRelaunchGeneration = 0;
+const x11WallpaperWindows = new WeakSet();
 const MAIN_WINDOW_CLICK_THROUGH_UNLOCK_HOTSPOT = {
   width: 48,
   height: 40,
@@ -315,6 +562,7 @@ function getPublicSettings() {
     [PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK_SETTING_KEY]: readStoredBoolean(PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK_SETTING_KEY, false),
     [UPDATE_CHANNEL_SETTING_KEY]: getCurrentReleaseChannel().id,
     'enable_player_page_native_blur': store.get('enable_player_page_native_blur') === true,
+    [WALLPAPER_MODE_SETTING_KEY]: isWallpaperModeEnabled(),
   };
 }
 
@@ -498,7 +746,7 @@ function clearWindowStateSaveTimer() {
 }
 
 function saveWindowState(win, options = {}) {
-  if (!win || win.isDestroyed()) {
+  if (!win || win.isDestroyed() || isX11WallpaperMode() || x11WallpaperWindows.has(win)) {
     return;
   }
 
@@ -767,7 +1015,7 @@ function refreshTrayMenu() {
         createRemoteControlWindow();
       },
     },
-    {
+    ...(!isX11WallpaperMode() ? [{
       label: locale.trayToggleClickThrough,
       type: 'checkbox',
       checked: mainWindowClickThroughEnabled,
@@ -775,7 +1023,7 @@ function refreshTrayMenu() {
       click: () => {
         setMainWindowClickThroughEnabled(!mainWindowClickThroughEnabled);
       },
-    },
+    }] : []),
     {
       label: locale.trayHideTaskbar,
       type: 'checkbox',
@@ -820,13 +1068,28 @@ function ensureTray() {
   return appTray;
 }
 
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-
-if (!gotSingleInstanceLock) {
-  app.quit();
-} else {
-  app.on('second-instance', () => {
-    focusMainWindow();
+// Retries the single-instance lock for a short window during a relaunch race
+// (FOLIA_RELAUNCH=1): the old instance has just called app.exit() and is about to
+// release the lock, so a fresh process may need a few attempts before it wins it.
+function acquireSingleInstanceLock() {
+  if (app.requestSingleInstanceLock()) {
+    return true;
+  }
+  if (process.env.FOLIA_RELAUNCH !== '1') {
+    return false; // ordinary second launch: behave as before (focus existing instance and quit)
+  }
+  const deadline = Date.now() + 10_000;
+  return new Promise((resolve) => {
+    const attempt = () => {
+      if (app.requestSingleInstanceLock()) {
+        return resolve(true);
+      }
+      if (Date.now() >= deadline) {
+        return resolve(false);
+      }
+      setTimeout(attempt, 500);
+    };
+    attempt();
   });
 }
 
@@ -1236,6 +1499,22 @@ function isUpdateCheckSupported() {
   return getUpdateCheckSupportReason() === null;
 }
 
+function isDevUpdatePreviewEnabled() {
+  return process.env.ELECTRON_DEV === 'true' && process.env.FOLIA_DEV_UPDATE_PREVIEW === 'true';
+}
+
+// Builds a believable next patch version so the preview stays aligned with package metadata.
+function getDevUpdatePreviewVersion() {
+  const currentVersion = normalizeVersion(app.getVersion());
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(currentVersion);
+
+  if (!match) {
+    return '999.0.0';
+  }
+
+  return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+}
+
 function isAutoUpdaterSupported() {
   return (
     isUpdateCheckSupported() &&
@@ -1257,12 +1536,13 @@ const updateState = {
 
 function getUpdateStatus() {
   const availableVersion = updateState.availableVersion;
+  const isDevPreview = isDevUpdatePreviewEnabled();
 
   return {
     ...updateState,
-    supported: isAutoUpdaterSupported(),
-    updateCheckSupported: isUpdateCheckSupported(),
-    updateCheckSupportReason: getUpdateCheckSupportReason(),
+    supported: isDevPreview || isAutoUpdaterSupported(),
+    updateCheckSupported: isDevPreview || isUpdateCheckSupported(),
+    updateCheckSupportReason: isDevPreview ? null : getUpdateCheckSupportReason(),
     platform: process.platform,
     updateCheckEnabled: getUpdateCheckEnabled(),
     autoUpdateEnabled: getAutoUpdateEnabled(),
@@ -1389,6 +1669,11 @@ function configureAutoUpdaterChannel(updater) {
 }
 
 async function downloadAvailableUpdate() {
+  if (isDevUpdatePreviewEnabled()) {
+    setUpdateState({ status: 'downloaded', error: null, downloadProgress: null });
+    return getUpdateStatus();
+  }
+
   if (!isAutoUpdaterSupported()) {
     setUpdateState({ status: 'unsupported', error: null });
     return getUpdateStatus();
@@ -1427,6 +1712,19 @@ async function downloadAvailableUpdate() {
 }
 
 async function checkForUpdates({ manual = false } = {}) {
+  if (isDevUpdatePreviewEnabled()) {
+    const availableVersion = getDevUpdatePreviewVersion();
+    setUpdateState({
+      status: 'available',
+      availableVersion,
+      updateUrl: getReleaseUrl(getCurrentReleaseChannel().id, availableVersion, FOLIA_RELEASES_URL),
+      error: null,
+      lastCheckedAt: Date.now(),
+      downloadProgress: null,
+    });
+    return getUpdateStatus();
+  }
+
   if (!getUpdateCheckEnabled() && !manual) {
     setUpdateState({ status: 'disabled', error: null, downloadProgress: null });
     return getUpdateStatus();
@@ -1493,6 +1791,11 @@ async function openExternalUrl(url) {
 }
 
 function scheduleStartupUpdateCheck() {
+  if (isDevUpdatePreviewEnabled()) {
+    void checkForUpdates({ manual: true });
+    return;
+  }
+
   if (!getUpdateCheckEnabled()) {
     setUpdateState({ status: 'disabled', error: null });
     return;
@@ -2735,6 +3038,12 @@ function applyMainWindowMouseIgnoreState() {
 }
 
 function setMainWindowClickThroughEnabled(enabled) {
+  // Refuse to enable on X11 wallpaper mode: clicks would reach the KDE desktop window and KWin
+  // would raise it above Folia (both desktop-type), covering the wallpaper. The state stays off.
+  if (Boolean(enabled) && isX11WallpaperMode()) {
+    return mainWindowClickThroughEnabled;
+  }
+
   mainWindowClickThroughEnabled = Boolean(enabled);
   if (!mainWindowClickThroughEnabled) {
     mainWindowClickThroughUnlockHover = false;
@@ -2772,6 +3081,20 @@ function sendRemoteControlSnapshot(snapshot) {
   return true;
 }
 
+// Wallpaper mode (Wayland): windowtolayer turns the first window it sees into the layer
+// surface and passes every later one through to xdg-shell as an ordinary window. The main
+// window claims that slot at startup, but a hidden window has no surface at all, so show it
+// again before building a secondary window — otherwise the secondary window would become the
+// wallpaper. No-op outside a wrapped session.
+function ensureWallpaperLayerHeldByMainWindow() {
+  if (!isWallpaperWrapped() || !mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+}
+
 function createRemoteControlWindow() {
   if (remoteControlWindow && !remoteControlWindow.isDestroyed()) {
     remoteControlWindow.setTitle(REMOTE_CONTROL_WINDOW_TITLE);
@@ -2782,6 +3105,8 @@ function createRemoteControlWindow() {
     broadcastPlaybackSyncBridgeStatus();
     return remoteControlWindow;
   }
+
+  ensureWallpaperLayerHeldByMainWindow();
 
   const win = new BrowserWindow({
     modal: false,
@@ -2879,34 +3204,78 @@ async function getMainWindowCaptureSource() {
 
 function createWindow(options = {}) {
   const { showImmediately = true } = options;
-  const { bounds: storedBounds, isMaximized } = getStoredWindowState();
-  const windowBounds = ensureWindowBoundsVisible(storedBounds);
+  // X11 wallpaper mode: the main window becomes a desktop window (maps to
+  // _NET_WM_WINDOW_TYPE_DESKTOP) covering the whole work area. Wayland ignores the
+  // type option, so this branch is mutually exclusive with the windowtolayer path.
+  const useDesktopWindowType = isX11WallpaperMode();
+  // On a scaled X11 desktop (KWin display scale > 1) the bounds from the screen module are
+  // device-independent pixels, and Chromium clamps a window that is mapped immediately to the
+  // work-area width (which excludes panels). The window must therefore be mapped hidden, sized to
+  // the full display, and then shown — a fresh map at the explicit bounds covers the whole screen.
+  const deferShowForDesktopSizing = useDesktopWindowType && showImmediately;
+  const { bounds: storedBounds, isMaximized: storedMaximized } = getStoredWindowState();
+  const windowBounds = useDesktopWindowType
+    ? screen.getPrimaryDisplay().bounds
+    : ensureWindowBoundsVisible(storedBounds);
+  const isMaximized = useDesktopWindowType ? false : storedMaximized;
   const useTransparentWindow = isTransparentPlayerBackgroundEnabled();
   const enableNativeBlur = store.get('enable_player_page_native_blur') === true;
-  const win = new BrowserWindow({
-    ...windowBounds,
-    minWidth: 350,
-    minHeight: 100,
-    frame: false,
-    transparent: useTransparentWindow,
-    hasShadow: !useTransparentWindow,
-    thickFrame: process.platform === 'win32' ? !useTransparentWindow : undefined,
-    backgroundColor: (useTransparentWindow || enableNativeBlur) ? '#00000000' : '#09090b',
-    vibrancy: (!useTransparentWindow && enableNativeBlur) && process.platform === 'darwin' ? 'fullscreen-ui' : undefined,
-    backgroundMaterial: (!useTransparentWindow && enableNativeBlur) && process.platform === 'win32' ? 'acrylic' : undefined,
-    autoHideMenuBar: true,
-    icon: APP_ICON_PATH,
-    skipTaskbar: mainWindowSkipTaskbarEnabled,
-    alwaysOnTop: mainWindowAlwaysOnTop,
-    show: showImmediately,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
-      nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: true, // Disable for local app
-      backgroundThrottling: false
-    }
+  let win;
+  try {
+    win = new BrowserWindow({
+      ...windowBounds,
+      type: useDesktopWindowType ? 'desktop' : undefined,
+      minWidth: 350,
+      minHeight: 100,
+      frame: false,
+      transparent: useTransparentWindow,
+      hasShadow: !useTransparentWindow,
+      thickFrame: process.platform === 'win32' ? !useTransparentWindow : undefined,
+      backgroundColor: (useTransparentWindow || enableNativeBlur) ? '#00000000' : '#09090b',
+      vibrancy: (!useTransparentWindow && enableNativeBlur) && process.platform === 'darwin' ? 'fullscreen-ui' : undefined,
+      backgroundMaterial: (!useTransparentWindow && enableNativeBlur) && process.platform === 'win32' ? 'acrylic' : undefined,
+      autoHideMenuBar: true,
+      icon: APP_ICON_PATH,
+      skipTaskbar: mainWindowSkipTaskbarEnabled,
+      // Desktop windows already live below every normal window; alwaysOnTop is meaningless here.
+      alwaysOnTop: useDesktopWindowType ? false : mainWindowAlwaysOnTop,
+      show: showImmediately && !deferShowForDesktopSizing,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.cjs'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: true, // Disable for local app
+        backgroundThrottling: false
+      }
+    });
+  } catch (error) {
+    // Watchdog trigger point 1: failing to build the window means the wallpaper session
+    // never connected to the compositor; recover instead of leaving the app dead.
+    console.error('[Wallpaper] Failed to create main window', error);
+    wallpaperWatchdog.handleWindowBuildFailure();
+    throw error;
+  }
+
+  if (useDesktopWindowType) {
+    x11WallpaperWindows.add(win);
+  }
+
+  // Watchdog trigger point 1: a crashed renderer breaks the wallpaper connection.
+  win.webContents.on('render-process-gone', (_event, details) => {
+    wallpaperWatchdog.handleRendererGone(details);
   });
+
+  // Wallpaper desktop windows: re-assert the full display bounds while still hidden, then show.
+  // Without the re-assert the initial map would be clamped to the work area (see
+  // deferShowForDesktopSizing), leaving an uncovered strip. When showImmediately is false the
+  // caller (e.g. recreateMainWindowWithTransparencyMode) owns the show, but the bounds fix still
+  // applies so the window is full-size by the time it appears.
+  if (useDesktopWindowType) {
+    win.setBounds(screen.getPrimaryDisplay().bounds);
+  }
+  if (deferShowForDesktopSizing) {
+    win.show();
+  }
 
   loadAppEntry(win);
   if (isElectronDevRuntime()) {
@@ -2920,7 +3289,10 @@ function createWindow(options = {}) {
   mainWindow = win;
   ensureTray();
   setMainWindowSkipTaskbarEnabled(mainWindowSkipTaskbarEnabled);
-  applyMainWindowMouseIgnoreState();
+  // Full initializer, not just applyMainWindowMouseIgnoreState(): when click-through is on at
+  // startup (wallpaper mode) this also starts the unlock-hotspot monitor, so the user can still
+  // reveal the lock button to turn click-through back off.
+  setMainWindowClickThroughEnabled(mainWindowClickThroughEnabled);
   updateWindowThumbarButtons();
   win.on('resize', () => {
     saveWindowState(win, { deferred: true });
@@ -2971,6 +3343,17 @@ function recreateMainWindowWithTransparencyMode(enabled, handoff = null) {
   saveWindowState(previousWindow);
   mainWindow = null;
 
+  // Wallpaper mode: windowtolayer only hands the layer surface to a window created while no
+  // other window holds it (see ensureWallpaperLayerHeldByMainWindow), so the old wallpaper
+  // window must be gone before the replacement is built — otherwise the rebuilt main window
+  // comes back as an ordinary window and the wallpaper disappears with the old one.
+  if (isWallpaperWrapped()) {
+    previousWindow.destroy();
+    const createdWindow = createWindow();
+    focusMainWindow();
+    return createdWindow;
+  }
+
   const nextWindow = createWindow({ showImmediately: false });
   nextWindow.once('ready-to-show', () => {
     nextWindow.show();
@@ -3002,8 +3385,32 @@ async function setMainWindowTransparentModeFromRemote(enabled) {
 }
 
 app.whenReady().then(async () => {
+  const startupResult = await mainProcessStartupPromise;
+  if (startupResult === 'duplicate') {
+    app.quit();
+    return;
+  }
+  if (startupResult === 'spawned') {
+    return;
+  }
+  if (startupResult === 'fallback') {
+    mainWindowClickThroughEnabled = false;
+  }
+
   if (process.platform === 'win32') {
     app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
+  }
+
+  if (process.platform === 'linux' && typeof safeStorage.getSelectedStorageBackend === 'function') {
+    const backend = safeStorage.getSelectedStorageBackend();
+    // Without a real backend the KuGou and QQ repositories keep credentials in memory only, so this
+    // line is the fastest way to tell a lost-login report apart from an authentication bug.
+    if (backend === 'basic_text' || !safeStorage.isEncryptionAvailable()) {
+      console.warn('[Electron] No OS credential encryption available; online accounts will not persist', {
+        backend,
+        desktop: process.env.XDG_CURRENT_DESKTOP || null,
+      });
+    }
   }
 
   setupFileSystemAccessPermissionHandlers();
@@ -3122,12 +3529,18 @@ ipcMain.handle('save-settings', (event, key, value) => {
     key === TRANSPARENT_PLAYER_BACKGROUND_SETTING_KEY ||
     key === DISCORD_RICH_PRESENCE_ENABLED_SETTING_KEY ||
     key === VOICE_INPUT_PAUSE_ENABLED_SETTING_KEY ||
-    key === PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK_SETTING_KEY
+    key === PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK_SETTING_KEY ||
+    key === WALLPAPER_MODE_SETTING_KEY
   ) {
     nextValue = Boolean(value);
   }
-
   store.set(key, nextValue);
+
+  if (key === WALLPAPER_MODE_SETTING_KEY) {
+    // Let the renderer receive its save-settings response before the process relaunches, while
+    // coalescing rapid toggles into one handoff/relaunch operation.
+    scheduleWallpaperModeRelaunch(Boolean(nextValue));
+  }
 
   if (key === 'enable_player_page_native_blur') {
     if (!isTransparentPlayerBackgroundEnabled()) {
@@ -3300,6 +3713,13 @@ ipcMain.handle('updates-quit-and-install', () => {
   const updater = ensureAutoUpdater();
   if (!isAutoUpdaterSupported() || !updater || updateState.status !== 'downloaded') {
     return false;
+  }
+
+  // Wallpaper mode is process-wide state: quitAndInstall relaunches the app without letting us
+  // clear env, and a wrapped session's WAYLAND_SOCKET is a dead fd after restart. Drop the mode
+  // first so the updated app comes back as a normal window.
+  if (isWallpaperModeEnabled()) {
+    store.set(WALLPAPER_MODE_SETTING_KEY, false);
   }
 
   updater.quitAndInstall(false, true);

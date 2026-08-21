@@ -1,6 +1,6 @@
 import { collectVisualizerTunings } from '../components/visualizer/tuningRegistry';
 import { useSettingsUiStore } from '../stores/useSettingsUiStore';
-import { readStoredThemeAutoGenerateEnabled, readStoredThemeAutoSwitchEnabled } from '../services/themePreferences';
+import { readStoredThemeAutoGenerateEnabled, readStoredThemeAutoSwitchEnabled, readStoredThemeGenerationSource } from '../services/themePreferences';
 import type { CappellaAvatarImage, CappellaEmojiImage, CappellaTuning, MonetBackgroundImage, MonetBackgroundTuning, MonetPortraitImage, MonetTuning, NomandBackgroundTuning } from '../types';
 
 // src/utils/visualSettingsConfig.ts
@@ -19,6 +19,7 @@ export function buildVisualSettingsConfig(): Record<string, unknown> {
   return {
     songThemeAutoSwitchEnabled,
     songThemeAutoGenerateEnabled,
+    themeGenerationSource: readStoredThemeGenerationSource(),
     followSystemTheme: store.followSystemTheme,
     visualizerMode: store.visualizerMode,
     randomVisualizerModePerSong: store.randomVisualizerModePerSong,
@@ -74,6 +75,7 @@ export function buildVisualSettingsConfig(): Record<string, unknown> {
     monetTuning: store.monetTuning,
     pendoloTuning: store.pendoloTuning,
     sonnetTuning: store.sonnetTuning,
+    temperaTuning: store.temperaTuning,
     urlBackgroundList: store.urlBackgroundList,
     urlBackgroundSelectedId: store.urlBackgroundSelectedId,
   };

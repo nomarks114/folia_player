@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type React from 'react';
-import { DEFAULT_CADENZA_TUNING, DEFAULT_CAPPELLA_TUNING, DEFAULT_CLASSIC_TUNING, DEFAULT_CLADDAGH_TUNING, DEFAULT_DIORAMA_TUNING, DEFAULT_FUME_TUNING, DEFAULT_LATENT_BACKGROUND_TUNING, DEFAULT_MONET_BACKGROUND_TUNING, DEFAULT_MONET_TUNING, DEFAULT_NOMAND_BACKGROUND_TUNING, DEFAULT_PARTITA_TUNING, DEFAULT_PENDOLO_TUNING, DEFAULT_SONNET_TUNING, DEFAULT_TILT_TUNING, DIORAMA_PARTICLE_DENSITY_MAX, DIORAMA_PARTICLE_DENSITY_MIN, DIORAMA_PARTICLE_GLOW_INTENSITY_MAX, DIORAMA_PARTICLE_GLOW_INTENSITY_MIN, DIORAMA_PARTICLE_SIZE_MAX, DIORAMA_PARTICLE_SIZE_MIN, type CadenzaTuning, type CappellaAvatarImage, type CappellaAvatarSource, type CappellaEmojiImage, type CappellaTuning, type ClassicTuning, type CladdaghTuning, type DioramaTuning, type FumeTuning, type LatentBackgroundColorSource, type LatentBackgroundDisplayMode, type LatentBackgroundTuning, type LocalLyricsPriority, type LyricProviderSource, type MonetBackgroundImage, type MonetBackgroundLayout, type MonetBackgroundSource, type MonetBackgroundTuning, type MonetBackgroundWashColorMode, type MonetPortraitImage, type MonetPortraitSource, type MonetTuning, type NomandBackgroundDitheringType, type NomandBackgroundEffect, type NomandBackgroundSource, type NomandBackgroundTuning, type PartitaTuning, type PendoloTuning, type QueueAddBehavior, type SonnetTuning, type StatusMessage, type StoredCappellaAvatarImage, type StoredCappellaEmojiImage, type StoredCustomLyricsFont, type StoredMonetBackgroundImage, type StoredMonetPortraitImage, type SubtitleContentMode, type Theme, type TiltTuning, type UrlBackgroundItem, type VisualizerBackgroundMode, type VisualizerFrameRate, type VisualizerMode } from '../types';
+import { DEFAULT_CADENZA_TUNING, DEFAULT_CAPPELLA_TUNING, DEFAULT_CLASSIC_TUNING, DEFAULT_CLADDAGH_TUNING, DEFAULT_DIORAMA_TUNING, DEFAULT_FUME_TUNING, DEFAULT_LATENT_BACKGROUND_TUNING, DEFAULT_MONET_BACKGROUND_TUNING, DEFAULT_MONET_TUNING, DEFAULT_NOMAND_BACKGROUND_TUNING, DEFAULT_PARTITA_TUNING, DEFAULT_PENDOLO_TUNING, DEFAULT_SONNET_TUNING, DEFAULT_TEMPERA_LAYER_IMAGE, DEFAULT_TEMPERA_TUNING, DEFAULT_TILT_TUNING, DIORAMA_PARTICLE_DENSITY_MAX, DIORAMA_PARTICLE_DENSITY_MIN, DIORAMA_PARTICLE_GLOW_INTENSITY_MAX, DIORAMA_PARTICLE_GLOW_INTENSITY_MIN, DIORAMA_PARTICLE_SIZE_MAX, DIORAMA_PARTICLE_SIZE_MIN, type CadenzaTuning, type CappellaAvatarImage, type CappellaAvatarSource, type CappellaEmojiImage, type CappellaTuning, type ClassicTuning, type CladdaghTuning, type DioramaTuning, type FumeTuning, type LatentBackgroundColorSource, type LatentBackgroundDisplayMode, type LatentBackgroundTuning, type LocalLyricsPriority, type LyricProviderSource, type MonetBackgroundImage, type MonetBackgroundLayout, type MonetBackgroundSource, type MonetBackgroundTuning, type MonetBackgroundWashColorMode, type MonetPortraitImage, type MonetPortraitSource, type MonetTuning, type NomandBackgroundDitheringType, type NomandBackgroundEffect, type NomandBackgroundSource, type NomandBackgroundTuning, type PartitaTuning, type PendoloTuning, type QueueAddBehavior, type SonnetTuning, type StatusMessage, type StoredCappellaAvatarImage, type StoredCappellaEmojiImage, type StoredCustomLyricsFont, type StoredMonetBackgroundImage, type StoredMonetPortraitImage, type SubtitleContentMode, type TemperaLayerImage, type TemperaTuning, type Theme, type TiltTuning, type UrlBackgroundItem, type VisualizerBackgroundMode, type VisualizerFrameRate, type VisualizerMode } from '../types';
 import { DEFAULT_VISUALIZER_MODE, getVisualizerModeLabel, getVisualizerRegistryEntry, hasVisualizerMode } from '../components/visualizer/registry';
 import { DEFAULT_VISUALIZER_BACKGROUND_MODE, hasVisualizerBackgroundMode } from '../components/visualizer/backgrounds/registry';
 import { resolveDioramaMoteCircumference, resolveDioramaMoteRadial } from '../components/visualizer/diorama/dioramaMoteField';
@@ -60,6 +60,7 @@ export const PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK_STORAGE_KEY = 'prevent_displa
 export const GLOBAL_LYRIC_TIMELINE_OFFSET_STORAGE_KEY = 'global_lyric_timeline_offset_ms';
 export const HIDE_TASKBAR_ICON_STORAGE_KEY = 'hide_taskbar_icon';
 export const REMOTE_CONTROL_SKIP_TASKBAR_STORAGE_KEY = 'remote_control_skip_taskbar';
+export const WALLPAPER_MODE_STORAGE_KEY = 'wallpaper_mode';
 export const OPEN_PLAYER_ON_LAUNCH_STORAGE_KEY = 'open_player_on_launch';
 export const SUBTITLE_OVERLAY_OPACITY_STORAGE_KEY = 'subtitle_overlay_opacity';
 export const SUBTITLE_OVERLAY_BACKGROUND_STORAGE_KEY = 'subtitle_overlay_background';
@@ -539,6 +540,75 @@ const readStoredSonnetTuning = (): SonnetTuning => {
         };
     } catch {
         return DEFAULT_SONNET_TUNING;
+    }
+};
+
+const clampUnit = (value: unknown, fallback: number) => (
+    typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback
+);
+
+/**
+ * Placement records ride in the tuning, so they arrive from localStorage, sync and pasted
+ * appearance codes alike. Every field is clamped rather than trusted; a bad scale would put a
+ * user's artwork off screen with no way to find it again.
+ */
+const sanitizeTemperaLayerImages = (value: unknown): TemperaLayerImage[] => {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap<TemperaLayerImage>(entry => {
+        if (!entry || typeof entry !== 'object') return [];
+        const record = entry as Partial<TemperaLayerImage>;
+        if (typeof record.id !== 'string' || !record.id) return [];
+        const align = record.align;
+        return [{
+            id: record.id,
+            name: typeof record.name === 'string' ? record.name : record.id,
+            align: align === 'left' || align === 'center' || align === 'right' || align === 'free'
+                ? align
+                : DEFAULT_TEMPERA_LAYER_IMAGE.align,
+            scale: typeof record.scale === 'number' && Number.isFinite(record.scale)
+                ? Math.min(2, Math.max(0.05, record.scale))
+                : DEFAULT_TEMPERA_LAYER_IMAGE.scale,
+            opacity: clampUnit(record.opacity, DEFAULT_TEMPERA_LAYER_IMAGE.opacity),
+        }];
+    }).slice(0, 8);
+};
+
+const readStoredTemperaTuning = (): TemperaTuning => {
+    if (typeof window === 'undefined') return DEFAULT_TEMPERA_TUNING;
+    const saved = localStorage.getItem('tempera_tuning');
+    if (!saved) return DEFAULT_TEMPERA_TUNING;
+    try {
+        const parsed = JSON.parse(saved) as Partial<TemperaTuning>;
+        return {
+            cameraIntensity: resolvePendoloNumber(parsed.cameraIntensity, DEFAULT_TEMPERA_TUNING.cameraIntensity, 0, 2),
+            glyphMotion: resolvePendoloNumber(parsed.glyphMotion, DEFAULT_TEMPERA_TUNING.glyphMotion, 0, 2),
+            glyphSettleStretch: resolvePendoloNumber(parsed.glyphSettleStretch, DEFAULT_TEMPERA_TUNING.glyphSettleStretch, 0, 1),
+            colorMode: parsed.colorMode === 'mono' || parsed.colorMode === 'gradient' ? parsed.colorMode : DEFAULT_TEMPERA_TUNING.colorMode,
+            textInversion: typeof parsed.textInversion === 'boolean' ? parsed.textInversion : DEFAULT_TEMPERA_TUNING.textInversion,
+            layerImages: sanitizeTemperaLayerImages(parsed.layerImages),
+            layerImageDepth: parsed.layerImageDepth === 'front' ? 'front' : 'back',
+            layerImageFrequency: clampUnit(parsed.layerImageFrequency, DEFAULT_TEMPERA_TUNING.layerImageFrequency),
+            showBlocks: typeof parsed.showBlocks === 'boolean'
+                ? parsed.showBlocks
+                : DEFAULT_TEMPERA_TUNING.showBlocks,
+            showDecor: typeof parsed.showDecor === 'boolean'
+                ? parsed.showDecor
+                : DEFAULT_TEMPERA_TUNING.showDecor,
+            enableTransitions: typeof parsed.enableTransitions === 'boolean'
+                ? parsed.enableTransitions
+                : DEFAULT_TEMPERA_TUNING.enableTransitions,
+            textureResolution: resolvePendoloNumber(parsed.textureResolution, DEFAULT_TEMPERA_TUNING.textureResolution, 0.5, 4),
+            postProcessEnabled: typeof parsed.postProcessEnabled === 'boolean'
+                ? parsed.postProcessEnabled
+                : DEFAULT_TEMPERA_TUNING.postProcessEnabled,
+            postProcessGrain: resolvePendoloNumber(parsed.postProcessGrain, DEFAULT_TEMPERA_TUNING.postProcessGrain, 0, 1),
+            postProcessContrast: resolvePendoloNumber(parsed.postProcessContrast, DEFAULT_TEMPERA_TUNING.postProcessContrast, 0, 1),
+            postProcessRgbShift: resolvePendoloNumber(parsed.postProcessRgbShift, DEFAULT_TEMPERA_TUNING.postProcessRgbShift, 0, 1),
+            postProcessVignette: resolvePendoloNumber(parsed.postProcessVignette, DEFAULT_TEMPERA_TUNING.postProcessVignette, 0, 2),
+            postProcessLensDistortion: resolvePendoloNumber(parsed.postProcessLensDistortion, DEFAULT_TEMPERA_TUNING.postProcessLensDistortion, 0, 2),
+        };
+    } catch {
+        return DEFAULT_TEMPERA_TUNING;
     }
 };
 
@@ -1263,6 +1333,7 @@ export type SettingsUiState = {
     preventDisplaySleepDuringPlayback: boolean;
     hideTaskbarIcon: boolean;
     hideRemoteControlTaskbarIcon: boolean;
+    wallpaperMode: boolean;
     openPlayerOnLaunch: boolean;
     enableMediaCache: boolean;
     backgroundOpacity: number;
@@ -1294,6 +1365,7 @@ export type SettingsUiState = {
     monetTuning: MonetTuning;
     pendoloTuning: PendoloTuning;
     sonnetTuning: SonnetTuning;
+    temperaTuning: TemperaTuning;
     storedCappellaEmojiPack: StoredCappellaEmojiImage[];
     cappellaCustomEmojiImages: CappellaEmojiImage[];
     isLoadingCappellaCustomEmojiPack: boolean;
@@ -1353,7 +1425,7 @@ export type SettingsUiState = {
     setAudioQuality: (quality: AudioQuality) => void;
     setTransparentPlayerBackgroundFromSystem: (enabled: boolean) => void;
     handleTogglePlayerPageNativeBlur: (enable: boolean) => void;
-    setDesktopPreferenceSnapshot: (settings: { MINIMIZE_TO_TRAY?: unknown; HIDE_TASKBAR_ICON?: unknown; REMOTE_CONTROL_SKIP_TASKBAR?: unknown; VOICE_INPUT_PAUSE_ENABLED?: unknown; PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK?: unknown; }) => void;
+    setDesktopPreferenceSnapshot: (settings: { MINIMIZE_TO_TRAY?: unknown; HIDE_TASKBAR_ICON?: unknown; REMOTE_CONTROL_SKIP_TASKBAR?: unknown; VOICE_INPUT_PAUSE_ENABLED?: unknown; PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK?: unknown; wallpaper_mode?: unknown; }) => void;
     setStoredCappellaEmojiPack: (pack: StoredCappellaEmojiImage[]) => void;
     setCappellaCustomEmojiImages: (images: CappellaEmojiImage[]) => void;
     setIsLoadingCappellaCustomEmojiPack: (loading: boolean) => void;
@@ -1393,6 +1465,7 @@ export type SettingsUiState = {
     handleTogglePreventDisplaySleepDuringPlayback: (enable: boolean) => void;
     handleToggleHideTaskbarIcon: (enable: boolean) => void;
     handleToggleHideRemoteControlTaskbarIcon: (enable: boolean) => void;
+    handleToggleWallpaperMode: (enable: boolean) => void;
     handleToggleOpenPlayerOnLaunch: (enable: boolean) => void;
     handleToggleMediaCache: (enable: boolean) => void;
     handleSetBackgroundOpacity: (opacity: number) => void;
@@ -1443,6 +1516,8 @@ export type SettingsUiState = {
     handleResetPendoloTuning: () => void;
     handleSetSonnetTuning: (patch: Partial<SonnetTuning>) => void;
     handleResetSonnetTuning: () => void;
+    handleSetTemperaTuning: (patch: Partial<TemperaTuning>) => void;
+    handleResetTemperaTuning: () => void;
     handleUploadMonetBackgroundImage: (files: File[]) => Promise<{ ok: boolean; error?: string; }>;
     handleClearMonetBackgroundImage: () => Promise<void>;
     handleUploadMonetPortraitImage: (files: File[]) => Promise<{ ok: boolean; error?: string; }>;
@@ -1529,6 +1604,7 @@ export const useSettingsUiStore = create<SettingsUiState>((set, get) => ({
     preventDisplaySleepDuringPlayback: getStoredBoolean(PREVENT_DISPLAY_SLEEP_DURING_PLAYBACK_STORAGE_KEY, false),
     hideTaskbarIcon: getStoredBoolean(HIDE_TASKBAR_ICON_STORAGE_KEY, false),
     hideRemoteControlTaskbarIcon: getStoredBoolean(REMOTE_CONTROL_SKIP_TASKBAR_STORAGE_KEY, false),
+    wallpaperMode: getStoredBoolean(WALLPAPER_MODE_STORAGE_KEY, false),
     openPlayerOnLaunch: getStoredBoolean(OPEN_PLAYER_ON_LAUNCH_STORAGE_KEY, false),
     enableMediaCache: getStoredBoolean(ENABLE_MEDIA_CACHE_KEY, false),
     backgroundOpacity: readStoredBackgroundOpacity(),
@@ -1560,6 +1636,7 @@ export const useSettingsUiStore = create<SettingsUiState>((set, get) => ({
     monetTuning: readStoredMonetTuning(),
     pendoloTuning: readStoredPendoloTuning(),
     sonnetTuning: readStoredSonnetTuning(),
+    temperaTuning: readStoredTemperaTuning(),
     storedCappellaEmojiPack: [],
     cappellaCustomEmojiImages: [],
     isLoadingCappellaCustomEmojiPack: true,
@@ -1666,6 +1743,10 @@ export const useSettingsUiStore = create<SettingsUiState>((set, get) => ({
         if (typeof settings.REMOTE_CONTROL_SKIP_TASKBAR === 'boolean') {
             patch.hideRemoteControlTaskbarIcon = settings.REMOTE_CONTROL_SKIP_TASKBAR;
             setStoredBoolean(REMOTE_CONTROL_SKIP_TASKBAR_STORAGE_KEY, settings.REMOTE_CONTROL_SKIP_TASKBAR);
+        }
+        if (typeof settings.wallpaper_mode === 'boolean') {
+            patch.wallpaperMode = settings.wallpaper_mode;
+            setStoredBoolean(WALLPAPER_MODE_STORAGE_KEY, settings.wallpaper_mode);
         }
         set(patch);
     },
@@ -1897,6 +1978,18 @@ export const useSettingsUiStore = create<SettingsUiState>((set, get) => ({
         if (window.electron?.saveSettings) {
             void window.electron.saveSettings('REMOTE_CONTROL_SKIP_TASKBAR', enable);
         }
+    },
+    handleToggleWallpaperMode: (enable) => {
+        setStoredBoolean(WALLPAPER_MODE_STORAGE_KEY, enable);
+        set({ wallpaperMode: enable });
+        if (window.electron?.saveSettings) {
+            // The main process schedules a full relaunch after this IPC returns.
+            void window.electron.saveSettings('wallpaper_mode', enable);
+        }
+        notify(get, {
+            type: 'info',
+            text: i18n.t('notifications.' + (enable ? 'wallpaperModeOn' : 'wallpaperModeOff')),
+        });
     },
     handleToggleOpenPlayerOnLaunch: (enable) => {
         setStoredBoolean(OPEN_PLAYER_ON_LAUNCH_STORAGE_KEY, enable);
@@ -2280,6 +2373,42 @@ export const useSettingsUiStore = create<SettingsUiState>((set, get) => ({
         set({ sonnetTuning: DEFAULT_SONNET_TUNING });
         notify(get, { type: 'info', text: i18n.t('notifications.sonnetReset') });
     },
+    handleSetTemperaTuning: (patch: Partial<TemperaTuning>) => {
+        const prev = get().temperaTuning;
+        const next: TemperaTuning = {
+            cameraIntensity: resolvePendoloNumber(patch.cameraIntensity, prev.cameraIntensity, 0, 2),
+            glyphMotion: resolvePendoloNumber(patch.glyphMotion, prev.glyphMotion, 0, 2),
+            glyphSettleStretch: resolvePendoloNumber(patch.glyphSettleStretch, prev.glyphSettleStretch, 0, 1),
+            colorMode: patch.colorMode === 'duo' || patch.colorMode === 'mono' || patch.colorMode === 'gradient' ? patch.colorMode : prev.colorMode,
+            textInversion: typeof patch.textInversion === 'boolean' ? patch.textInversion : prev.textInversion,
+            layerImages: patch.layerImages ? sanitizeTemperaLayerImages(patch.layerImages) : prev.layerImages,
+            layerImageDepth: patch.layerImageDepth === 'front' || patch.layerImageDepth === 'back' ? patch.layerImageDepth : prev.layerImageDepth,
+            layerImageFrequency: patch.layerImageFrequency !== undefined ? clampUnit(patch.layerImageFrequency, prev.layerImageFrequency) : prev.layerImageFrequency,
+            showBlocks: typeof patch.showBlocks === 'boolean' ? patch.showBlocks : prev.showBlocks,
+            showDecor: typeof patch.showDecor === 'boolean' ? patch.showDecor : prev.showDecor,
+            enableTransitions: typeof patch.enableTransitions === 'boolean'
+                ? patch.enableTransitions
+                : prev.enableTransitions,
+            textureResolution: resolvePendoloNumber(patch.textureResolution, prev.textureResolution, 0.5, 4),
+            postProcessEnabled: typeof patch.postProcessEnabled === 'boolean'
+                ? patch.postProcessEnabled
+                : prev.postProcessEnabled,
+            postProcessGrain: resolvePendoloNumber(patch.postProcessGrain, prev.postProcessGrain, 0, 1),
+            postProcessContrast: resolvePendoloNumber(patch.postProcessContrast, prev.postProcessContrast, 0, 1),
+            postProcessRgbShift: resolvePendoloNumber(patch.postProcessRgbShift, prev.postProcessRgbShift, 0, 1),
+            postProcessVignette: resolvePendoloNumber(patch.postProcessVignette, prev.postProcessVignette, 0, 2),
+            postProcessLensDistortion: resolvePendoloNumber(patch.postProcessLensDistortion, prev.postProcessLensDistortion, 0, 2),
+        };
+        if (typeof window !== 'undefined') localStorage.setItem('tempera_tuning', JSON.stringify(next));
+        set({ temperaTuning: next });
+    },
+    handleResetTemperaTuning: () => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('tempera_tuning', JSON.stringify(DEFAULT_TEMPERA_TUNING));
+        }
+        set({ temperaTuning: DEFAULT_TEMPERA_TUNING });
+        notify(get, { type: 'info', text: i18n.t('notifications.temperaReset') });
+    },
     handleSetCappellaTuning: (patch) => {
         const requestedCustomWithoutPack = patch.emojiPackSource === 'custom' && get().storedCappellaEmojiPack.length === 0;
         if (requestedCustomWithoutPack) {
@@ -2344,7 +2473,7 @@ export const useSettingsUiStore = create<SettingsUiState>((set, get) => ({
             localStorage.setItem('diorama_tuning', JSON.stringify(DEFAULT_DIORAMA_TUNING));
         }
         set({ dioramaTuning: DEFAULT_DIORAMA_TUNING });
-        notify(get, { type: 'info', text: '镜台参数已重置' });
+        notify(get, { type: 'info', text: i18n.t('notifications.dioramaReset') });
     },
     handleSetMonetBackgroundTuning: (patch) => {
         const prev = get().monetBackgroundTuning;
@@ -2903,6 +3032,8 @@ export const selectSettingsUiSnapshot = (state: SettingsUiState) => ({
     preventDisplaySleepDuringPlayback: state.preventDisplaySleepDuringPlayback,
     hideTaskbarIcon: state.hideTaskbarIcon,
     hideRemoteControlTaskbarIcon: state.hideRemoteControlTaskbarIcon,
+    wallpaperMode: state.wallpaperMode,
+    handleToggleWallpaperMode: state.handleToggleWallpaperMode,
     openPlayerOnLaunch: state.openPlayerOnLaunch,
     enableMediaCache: state.enableMediaCache,
     backgroundOpacity: state.backgroundOpacity,
@@ -2940,6 +3071,7 @@ export const selectSettingsUiSnapshot = (state: SettingsUiState) => ({
     monetTuning: state.monetTuning,
     pendoloTuning: state.pendoloTuning,
     sonnetTuning: state.sonnetTuning,
+    temperaTuning: state.temperaTuning,
     cappellaCustomEmojiImages: state.cappellaCustomEmojiImages,
     isLoadingCappellaCustomEmojiPack: state.isLoadingCappellaCustomEmojiPack,
     cappellaCustomAvatarImages: state.cappellaCustomAvatarImages,
@@ -3048,6 +3180,8 @@ export const selectSettingsUiSnapshot = (state: SettingsUiState) => ({
     handleResetPendoloTuning: state.handleResetPendoloTuning,
     handleSetSonnetTuning: state.handleSetSonnetTuning,
     handleResetSonnetTuning: state.handleResetSonnetTuning,
+    handleSetTemperaTuning: state.handleSetTemperaTuning,
+    handleResetTemperaTuning: state.handleResetTemperaTuning,
     handleUploadMonetBackgroundImage: state.handleUploadMonetBackgroundImage,
     handleClearMonetBackgroundImage: state.handleClearMonetBackgroundImage,
     handleUploadMonetPortraitImage: state.handleUploadMonetPortraitImage,

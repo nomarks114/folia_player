@@ -28,6 +28,9 @@ import { useShallow } from 'zustand/react/shallow';
 import type { ObsBrowserSourceStatus } from '../../types/obsBrowserSource';
 import { getWebAiProvider } from '../../services/runtimeConfig';
 import type { LyricApiStatus } from '../../types/lyricApi';
+import type { SongResult } from '../../types';
+import type { ThemeCacheSongKey } from '../../services/themeCache';
+import type { ThemeGenerationSource } from '../../services/themePreferences';
 
 const DEFAULT_OPENAI_TEMPERATURE = '0.7';
 const VERSION_INFO = __DOCKER_STACK_VERSION__
@@ -48,9 +51,12 @@ interface SettingsModalProps {
     songThemeAutoSwitchEnabled: boolean;
     songThemeAutoGenerateEnabled: boolean;
     onSaveCustomTheme: (dualTheme: DualTheme) => void;
+    onSaveAiTheme: (dualTheme: DualTheme, song: SongResult | null, songKey: ThemeCacheSongKey | null) => void;
     onApplyCustomTheme: () => void;
     onToggleCustomThemePreferred: (enabled: boolean) => void;
     onToggleSongThemeAutoSwitch: (enabled: boolean) => void;
+    themeGenerationSource: ThemeGenerationSource;
+    onChangeThemeGenerationSource: (source: ThemeGenerationSource) => void;
     onToggleSongThemeAutoGenerate: (enabled: boolean) => void;
     onToggleNavidrome?: (enabled: boolean) => void;
     loadLyricFilterPreview: () => Promise<LyricData | null>;
@@ -82,6 +88,7 @@ interface SettingsModalProps {
 }
 
 const QUARK_DOWNLOAD_URL = 'https://pan.quark.cn/s/6e4c6fa3bc6f';
+const BAIDU_DOWNLOAD_URL = 'https://pan.baidu.com/s/1f0x3g-8PMcNCO-TJ5z1rPw?pwd=flia';
 const DEFAULT_UPDATE_CHANNEL: 'realeco' | 'limo' | 'cielo' | 'internal' = __APP_RELEASE_CHANNEL__ === 'limo'
     ? 'limo'
     : __APP_RELEASE_CHANNEL__ === 'cielo'
@@ -104,9 +111,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     songThemeAutoSwitchEnabled,
     songThemeAutoGenerateEnabled,
     onSaveCustomTheme,
+    onSaveAiTheme,
     onApplyCustomTheme,
     onToggleCustomThemePreferred,
     onToggleSongThemeAutoSwitch,
+    themeGenerationSource,
+    onChangeThemeGenerationSource,
     onToggleSongThemeAutoGenerate,
     onToggleNavidrome,
     loadLyricFilterPreview,
@@ -156,6 +166,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         voiceInputPauseEnabled,
         hideTaskbarIcon,
         hideRemoteControlTaskbarIcon,
+        wallpaperMode,
+        handleToggleWallpaperMode: onToggleWallpaperMode,
         openPlayerOnLaunch,
         enableMediaCache,
         backgroundOpacity,
@@ -185,6 +197,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         monetTuning,
         pendoloTuning,
         sonnetTuning,
+        temperaTuning,
         cappellaCustomEmojiImages,
         isLoadingCappellaCustomEmojiPack,
         cappellaCustomAvatarImages,
@@ -261,6 +274,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         handleResetPendoloTuning: onResetPendoloTuning,
         handleSetSonnetTuning: onSonnetTuningChange,
         handleResetSonnetTuning: onResetSonnetTuning,
+        handleSetTemperaTuning: onTemperaTuningChange,
+        handleResetTemperaTuning: onResetTemperaTuning,
         handleUploadMonetBackgroundImage: onUploadMonetBackgroundImage,
         handleClearMonetBackgroundImage: onClearMonetBackgroundImage,
         handleUploadMonetPortraitImage: onUploadMonetPortraitImage,
@@ -629,14 +644,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         await window.electron?.quitAndInstallUpdate?.();
     };
 
-    const handleOpenChinaDownload = async () => {
+    const handleOpenDownloadUrl = async (url: string) => {
         if (window.electron?.openExternalUrl) {
-            await window.electron.openExternalUrl(QUARK_DOWNLOAD_URL);
+            await window.electron.openExternalUrl(url);
             return;
         }
 
-        window.open(QUARK_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+        window.open(url, '_blank', 'noopener,noreferrer');
     };
+
+    const handleOpenChinaDownload = () => handleOpenDownloadUrl(QUARK_DOWNLOAD_URL);
+    const handleOpenBaiduDownload = () => handleOpenDownloadUrl(BAIDU_DOWNLOAD_URL);
 
     // Navidrome Settings State
     const [navidromeEnabled, setNavidromeEnabledState] = useState(false);
@@ -1323,9 +1341,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                 onClick={handleAuthorLabelClick}
                                                 className="hover:opacity-100 transition-opacity"
                                                 style={{ color: 'inherit' }}
-                                                aria-label="meow"
+                                                aria-label={t('help.madeBy')}
                                             >
-                                                {t('help.madeBy') || "Made by"}
+                                                {t('help.madeBy')}
                                             </button>{' '}
                                             <a href="https://github.com/chthollyphile/folia-major" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors underline decoration-white/30 hover:decoration-white">chthollyphile/folia-major</a>
                                         </p>
@@ -1345,66 +1363,82 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                 : VERSION_INFO}
                                         </button>
 
-                                        {/* 第二行：发现新版本与操作按钮 */}
+                                        {/* 第二行：版本状态与安装操作 */}
                                         {updateStatus?.availableVersion && (
-                                            <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 mt-0.5">
-                                                <span className="text-amber-500 font-semibold">
-                                                    {t('options.newVersionFound', { version: updateStatus.availableVersion })}
-                                                </span>
-
-                                                {updateStatus.status === 'downloaded' ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleInstallUpdate}
-                                                        className="text-green-400 font-bold hover:underline ml-1"
-                                                    >
-                                                        {t('options.restartToInstallUpdate')}
-                                                    </button>
-                                                ) : updateStatus.status === 'downloading' ? (
-                                                    <span className="text-zinc-300 opacity-80 ml-1">
-                                                        {t('options.downloadingProgress', { percent: Math.round(updateStatus.downloadProgress?.percent || 0) })}
+                                            <>
+                                                <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 mt-0.5">
+                                                    <span className="text-amber-500 font-semibold">
+                                                        {t('options.newVersionFound', { version: updateStatus.availableVersion })}
                                                     </span>
-                                                ) : (
-                                                    !electronSettings.ENABLE_AUTO_UPDATE && (
+
+                                                    {updateStatus.status === 'downloaded' ? (
                                                         <button
                                                             type="button"
-                                                            onClick={handleDownloadUpdate}
-                                                            disabled={!canDownloadUpdate}
-                                                            className="text-zinc-100 hover:text-white font-bold flex items-center justify-center transition-colors disabled:opacity-40 ml-1"
-                                                            title="立即下载"
-                                                            aria-label="立即下载"
+                                                            onClick={handleInstallUpdate}
+                                                            className="text-green-400 font-bold hover:underline"
                                                         >
-                                                            <Download size={13} />
+                                                            {t('options.restartToInstallUpdate')}
                                                         </button>
-                                                    )
-                                                )}
+                                                    ) : updateStatus.status === 'downloading' ? (
+                                                        <span className="text-zinc-300 opacity-80">
+                                                            {t('options.downloadingProgress', { percent: Math.round(updateStatus.downloadProgress?.percent || 0) })}
+                                                        </span>
+                                                    ) : (
+                                                        !electronSettings.ENABLE_AUTO_UPDATE && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleDownloadUpdate}
+                                                                disabled={!canDownloadUpdate}
+                                                                className="text-zinc-100 hover:text-white font-bold inline-flex items-center gap-1 transition-colors disabled:opacity-40"
+                                                            >
+                                                                <Download size={12} />
+                                                                {t('options.downloadUpdate')}
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </div>
 
-                                                {showQuarkDownload && updateStatus.platform !== 'linux' && (
-                                                    <>
-                                                        <span className="opacity-25 select-none" style={{ color: 'var(--text-secondary)' }}>|</span>
-
+                                                {/* 下载入口独立成可换行的小组，避免与版本状态挤在同一行。 */}
+                                                <div
+                                                    className="mt-1 flex max-w-full flex-wrap items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.035] p-1"
+                                                    aria-label={t('options.downloadSources')}
+                                                >
+                                                    <span className="px-1.5 opacity-45" style={{ color: 'var(--text-secondary)' }}>
+                                                        {t('options.downloadSources')}
+                                                    </span>
+                                                    {showQuarkDownload && updateStatus.platform !== 'linux' && (
                                                         <button
                                                             type="button"
                                                             onClick={handleOpenChinaDownload}
-                                                            className="opacity-55 hover:opacity-100 transition-opacity hover:underline"
+                                                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 opacity-65 transition-colors hover:bg-white/10 hover:opacity-100"
                                                             style={{ color: 'var(--text-secondary)' }}
                                                         >
-                                                            {t('options.downloadChina')}
+                                                            <ExternalLink size={11} />
+                                                            {t('options.quarkDrive')}
                                                         </button>
-                                                    </>
-                                                )}
-
-                                                <span className="opacity-25 select-none" style={{ color: 'var(--text-secondary)' }}>|</span>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => window.electron?.openUpdateReleasePage(updateStatus.availableVersion)}
-                                                    className="opacity-55 hover:opacity-100 transition-opacity hover:underline"
-                                                    style={{ color: 'var(--text-secondary)' }}
-                                                >
-                                                    {t('options.goToGithubRelease')}
-                                                </button>
-                                            </div>
+                                                    )}
+                                                    {showQuarkDownload && updateStatus.platform !== 'linux' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenDownloadUrl(BAIDU_DOWNLOAD_URL)}
+                                                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 opacity-65 transition-colors hover:bg-white/10 hover:opacity-100"
+                                                            style={{ color: 'var(--text-secondary)' }}
+                                                        >
+                                                            <ExternalLink size={11} />
+                                                            {t('options.baiduDrive')}
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => window.electron?.openUpdateReleasePage(updateStatus.availableVersion)}
+                                                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 opacity-65 transition-colors hover:bg-white/10 hover:opacity-100"
+                                                        style={{ color: 'var(--text-secondary)' }}
+                                                    >
+                                                        <ExternalLink size={11} />
+                                                        {t('options.githubRelease')}
+                                                    </button>
+                                                </div>
+                                            </>
                                         )}
 
                                         {/* 第三行：多平台网络与手动下载提醒小字 */}
@@ -1525,6 +1559,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                 onToggleFollowSystemTheme={onSetFollowSystemTheme}
                                                 onToggleCustomThemePreferred={onToggleCustomThemePreferred}
                                                 onToggleSongThemeAutoSwitch={onToggleSongThemeAutoSwitch}
+                                                themeGenerationSource={themeGenerationSource}
+                                                onChangeThemeGenerationSource={onChangeThemeGenerationSource}
                                                 onToggleTransparentPlayerBackground={resolvedToggleTransparentPlayerBackground}
                                                 onToggleAutoHidePlayerChrome={onToggleAutoHidePlayerChrome}
                                                 onSaveCustomTheme={onSaveCustomTheme}
@@ -1662,6 +1698,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                     onCheckForUpdates: handleCheckForUpdates,
                                                     onDownloadUpdate: handleDownloadUpdate,
                                                     onInstallUpdate: handleInstallUpdate,
+                                                    onOpenBaiduDownload: handleOpenBaiduDownload,
                                                     onOpenChinaDownload: handleOpenChinaDownload,
                                                     onUpdateChannelChange: handleUpdateChannelChange,
                                                     onSaveElectronSettings: saveElectronSettings,
@@ -1681,6 +1718,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                     onToggleMinimizeToTray,
                                                     onToggleOpenPlayerOnLaunch,
                                                     openPlayerOnLaunch,
+                                                    wallpaperMode,
+                                                    onToggleWallpaperMode,
                                                 }}
                                             />
                                         )}
@@ -1804,6 +1843,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         monetTuning={monetTuning}
                         pendoloTuning={pendoloTuning}
                         sonnetTuning={sonnetTuning}
+                        temperaTuning={temperaTuning}
                         cappellaCustomEmojiImages={cappellaCustomEmojiImages}
                         cappellaCustomAvatarImages={cappellaCustomAvatarImages}
                         monetPortraitImage={monetPortraitImage}
@@ -1860,6 +1900,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         onResetPendoloTuning={onResetPendoloTuning}
                         onSonnetTuningChange={onSonnetTuningChange}
                         onResetSonnetTuning={onResetSonnetTuning}
+                        onTemperaTuningChange={onTemperaTuningChange}
+                        onResetTemperaTuning={onResetTemperaTuning}
                         onUploadMonetPortraitImage={onUploadMonetPortraitImage}
                         onClearMonetPortraitImage={onClearMonetPortraitImage}
                         isLoadingMonetPortraitImage={isLoadingMonetPortraitImage}
@@ -1891,6 +1933,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             monet: monetTuning,
                             pendolo: pendoloTuning,
                             sonnet: sonnetTuning,
+                            tempera: temperaTuning,
                         }}
                         staticMode={staticMode}
                         visualizerOpacity={visualizerOpacity}
@@ -1920,8 +1963,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         lyricsFontScale={lyricsFontScale}
                         lyricsFontWeight={lyricsFontWeight}
                         lyricsCustomFontFamily={lyricsCustomFontFamily}
-                        onSaveTheme={(dualTheme) => {
+                        onSaveCustomTheme={(dualTheme) => {
                             onSaveCustomTheme(dualTheme);
+                            setShowThemePark(false);
+                        }}
+                        onSaveAiTheme={(dualTheme, song, songKey) => {
+                            onSaveAiTheme(dualTheme, song, songKey);
                             setShowThemePark(false);
                         }}
                         onClose={() => closeSubviewOrModal(() => setShowThemePark(false))}

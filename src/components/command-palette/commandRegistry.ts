@@ -1,4 +1,5 @@
 import { PlayerState, type HomeViewTab, type ReplayGainMode, type SongResult, type VisualizerMode, type VisualizerBackgroundMode, type MonetBackgroundTuning } from '../../types';
+import i18n from '../../i18n/config';
 import type { AppLanguagePreference } from '../../i18n/config';
 import type { PanelTab } from '../UnifiedPanel';
 import { syncNow } from '../../services/sync/syncCoordinator';
@@ -137,7 +138,7 @@ const createQueueSearchCommand = (): CommandPaletteCommand => ({
     description: 'Search the current play queue',
     keywords: ['queue', '播放队列', '队列搜索', 'duilie', 'duiliesousuo', 'dl', 'dlss'],
     icon: ListMusic,
-    placeholder: '输入歌曲名 / 艺术家 / 索引',
+    placeholder: i18n.t('commandPalette.previewQueueSearchEmpty'),
     requiresInput: true,
     getPreview: (input, context) => {
         const trimmedInput = input.trim();
@@ -429,6 +430,18 @@ export const COMMAND_PALETTE_COMMANDS: CommandPaletteCommand[] = [
             return true;
         },
     },
+    createSettingsCommand('settings-wallpaper-mode', 'Wallpaper mode settings', 'Open wallpaper mode settings', ['wallpaper mode', 'desktop wallpaper', 'lyrics wallpaper', '壁纸模式', '桌面壁纸', '歌词壁纸', 'bizhimoshi', 'zhuomianbizhi', 'gecibizhi', 'bzms', 'zmbz', 'gcbz'], 'options', 'desktop'),
+    {
+        id: 'desktop-toggle-wallpaper-mode',
+        group: 'settings',
+        title: 'Toggle wallpaper mode',
+        description: 'Turn the app into a desktop lyrics wallpaper',
+        keywords: ['wallpaper mode', 'desktop wallpaper', 'lyrics wallpaper', '壁纸模式', '桌面壁纸', '歌词壁纸', 'bizhimoshi', 'zhuomianbizhi', 'gecibizhi', 'bzms', 'zmbz', 'gcbz'],
+        execute: (_input, context) => {
+            context.toggleWallpaperMode();
+            return true;
+        },
+    },
     createSettingsCommand('settings-lab', 'Lab settings', 'Open experimental settings', ['lab', 'experimental', '实验', '实验室', 'shiyan', 'shiyanshi', 'sy', 'sys'], 'options', 'lab'),
     createSettingsCommand('settings-visualizer', 'Visualizer settings', 'Open lyrics animation workbench', ['visualizer settings', 'visualizer workbench', '可视化', '歌词动画', 'keshihua', 'gecidonghua', 'ksh', 'gcdh', 'donghua'], 'options', 'visualizer'),
     createSettingsCommand('settings-theme-park', 'Color', 'Open theme editor', ['color', 'theme park', 'theme', '配色', '主题', '主题公园', 'peise', 'zhuti', 'zhutigongyuan', 'ps', 'zt', 'ztgy'], 'options', 'themePark'),
@@ -585,6 +598,34 @@ export const COMMAND_PALETTE_COMMANDS: CommandPaletteCommand[] = [
         },
     },
     {
+        id: 'theme-source-ai',
+        group: 'settings',
+        title: 'Theme source: AI inference',
+        description: 'Generate song themes by having AI read the lyrics',
+        keywords: ['theme source ai', 'ai theme source', 'theme generation source', '主题来源AI', '主题生成来源', 'AI推断', 'zhutilaiyuan', 'zhutishengchenglaiyuan', 'aituiduan', 'ztly', 'ztsclly', 'aitd'],
+        execute: (_input, context) => {
+            if (context.themeGenerationSource === 'ai') {
+                return false;
+            }
+            context.setThemeGenerationSource('ai');
+            return true;
+        },
+    },
+    {
+        id: 'theme-source-cover',
+        group: 'settings',
+        title: 'Theme source: cover colors',
+        description: 'Generate song themes from the cover artwork palette',
+        keywords: ['theme source cover', 'cover theme source', 'cover colors', 'theme generation source', '主题来源封面', '封面取色', '主题生成来源', 'fengmianqvse', 'fengmianquse', 'zhutilaiyuan', 'ztlyfm', 'fmqs'],
+        execute: (_input, context) => {
+            if (context.themeGenerationSource === 'cover') {
+                return false;
+            }
+            context.setThemeGenerationSource('cover');
+            return true;
+        },
+    },
+    {
         id: 'theme-quick-editor',
         group: 'settings',
         title: 'Quick theme editor',
@@ -618,6 +659,7 @@ export const COMMAND_PALETTE_COMMANDS: CommandPaletteCommand[] = [
     createVisualizerCommand('diorama', 'Visualizer: Diorama', 'Switch to Diorama visualizer', ['visualizer diorama', 'diorama', '镜台', 'jingtai', 'jt', '切换到可视化：镜台', '切换到可视化镜台']),
     createVisualizerCommand('pendolo', 'Visualizer: Pendolo', 'Switch to Pendolo visualizer', ['visualizer pendolo', 'pendolo', '擒纵', '摆轮', 'qinzong', 'bailun', 'pd', '切换到可视化：擒纵', '切换到可视化擒纵']),
     createVisualizerCommand('sonnet', 'Visualizer: Sonnet', 'Switch to Sonnet visualizer', ['visualizer sonnet', 'sonnet', '商籁', 'shanglai', 'sl', '文字 pv', 'mg pv', 'vocaloid']),
+    createVisualizerCommand('tempera', 'Visualizer: Tempera', 'Switch to Tempera visualizer', ['visualizer tempera', 'tempera', '凝彩', 'dancai', 'dc', '色块 pv', 'block pv']),
     {
         id: 'desktop-toggle-remote-control',
         group: 'navigation',
@@ -935,6 +977,14 @@ export const getAvailableCommandPaletteCommands = (context?: CommandPaletteConte
         }
     }
 
+    // Wallpaper mode is a Linux-only desktop feature; never offer it on web or other platforms.
+    if (command.id === 'settings-wallpaper-mode' || command.id === 'desktop-toggle-wallpaper-mode') {
+        const isLinuxElectron = typeof window !== 'undefined' && (window as any).electron?.platform === 'linux';
+        if (!isLinuxElectron) {
+            return false;
+        }
+    }
+
     if (command.id === 'desktop-toggle-voice-input-pause') {
         const isElectron = typeof window !== 'undefined' && Boolean((window as any).electron);
         if (!isElectron || !context?.voiceInputPauseSupported) {
@@ -952,6 +1002,15 @@ export const getAvailableCommandPaletteCommands = (context?: CommandPaletteConte
 
     if (command.id === 'theme-quick-editor') {
         return context ? context.canOpenThemeQuickEditor : true;
+    }
+
+    // Only offer the source the user is not already on.
+    if (command.id === 'theme-source-ai') {
+        return context ? context.themeGenerationSource !== 'ai' : true;
+    }
+
+    if (command.id === 'theme-source-cover') {
+        return context ? context.themeGenerationSource !== 'cover' : true;
     }
 
     if (command.group === 'search' && command.id !== 'search-current' && context) {
