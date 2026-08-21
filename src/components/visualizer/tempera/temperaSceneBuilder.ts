@@ -14,6 +14,11 @@ import {
     type TemperaGlyphView,
 } from './temperaTextView';
 import { createTemperaDifferenceFilter } from './temperaDifferenceFilter';
+import {
+    resolveTemperaPassResolution,
+    resolveTemperaTransitionBlurResolution,
+    type TemperaSceneFilterTarget,
+} from './temperaSceneFilters';
 import { buildTemperaImageLayer, type TemperaImageLayerView } from './temperaImageLayer';
 import {
     buildCrossRow,
@@ -43,6 +48,26 @@ import { createSonnetPrintFilters } from '../sonnet/sonnetPrintFilters';
 // Builds one bounded paragraph scene; playback-time mutation remains in the runtime controller.
 type PixiModule = typeof import('pixi.js');
 
+/**
+ * The lyric's colour filter. In gradient mode the ramp only exists as this filter's tint, so
+ * switching `textInversion` off must not take the filter with it - that would drop the whole
+ * colour mode back to flat ink. Without a ramp and without the inversion there is nothing left
+ * to do, and the layer stays unfiltered.
+ */
+const createTemperaTextFilter = (
+    pixi: PixiModule,
+    palette: TemperaPalette,
+    inversion: boolean,
+): import('pixi.js').Filter | null => {
+    if (!inversion && !palette.textGradient) return null;
+    return createTemperaDifferenceFilter(pixi, {
+        ink: palette.ink,
+        paper: palette.paper,
+        tint: palette.textGradient,
+        inversion,
+    });
+};
+
 export interface TemperaShotView {
     shot: TemperaShot;
     container: import('pixi.js').Container;
@@ -56,13 +81,13 @@ export interface TemperaShotView {
     revealDoneTime: number;
 }
 
-export interface TemperaSceneView {
+export interface TemperaSceneView extends TemperaSceneFilterTarget {
     paragraph: TemperaParagraph;
     container: import('pixi.js').Container;
     shots: TemperaShotView[];
     palette: TemperaPalette;
+    /** Everything the runtime has to destroy with the scene, blur included. */
     postProcessFilters: import('pixi.js').Filter[];
-    transitionBlurFilter: import('pixi.js').BlurFilter | null;
     activeShotIndex: number;
 }
 
@@ -287,14 +312,10 @@ export const buildTemperaCreditsPoster = (
     if (subtitle) buildLine(subtitle, Math.max(14, titleSize * 0.34), title.height / 2 + titleSize * 0.22, 0.75);
 
     // The title stays put while the shapes move under it, so the inversion keeps re-cutting it.
-    if (options.tuning.textInversion) {
-        const filter = createTemperaDifferenceFilter(pixi, {
-            ink: palette.ink,
-            paper: palette.paper,
-            tint: palette.textGradient,
-        });
-        titleLayer.filters = [filter];
-        filters.push(filter);
+    const titleFilter = createTemperaTextFilter(pixi, palette, options.tuning.textInversion);
+    if (titleFilter) {
+        titleLayer.filters = [titleFilter];
+        filters.push(titleFilter);
     }
     add(titleLayer, { enterDY: diagonal * 0.03, delay: 0.78 });
 
@@ -348,6 +369,14 @@ const applyTemperaScenePostProcess = (
         vignette: tuning.postProcessVignette,
     });
     if (printFilters.length > 0) filters.push(...printFilters);
+    // Every pass in the array has to carry the same resolution - Pixi keeps the minimum for the
+    // whole container - and none of the shared sonnet factories set one, so they would each
+    // default to a hard 1. See `resolveTemperaPassResolution` for why that softened the scene
+    // and why it is safe for the inversion nested below.
+    const resolution = resolveTemperaPassResolution(tuning);
+    filters.forEach(filter => {
+        filter.resolution = resolution;
+    });
     if (filters.length > 0) container.filters = filters;
     return filters;
 };
@@ -523,15 +552,12 @@ export const buildTemperaScene = (
         // Scoped to the text layer only: blendRequired copies the pixels under these bounds
         // every frame, so a full-scene filter here would be a viewport-sized blit. In gradient
         // colour mode the ramp rides along as a tint - the filter still decides the luminance,
-        // which is the only thing keeping the lyric readable over arbitrary artwork.
-        if (tuning.textInversion) {
-            const differenceFilter = createTemperaDifferenceFilter(pixi, {
-                ink: palette.ink,
-                paper: palette.paper,
-                tint: palette.textGradient,
-            });
-            textLayer.filters = [differenceFilter];
-            postProcessFilters.push(differenceFilter);
+        // which is the only thing keeping the lyric readable over arbitrary artwork. With the
+        // inversion switched off the same ramp is applied on its own, with no backdrop read.
+        const textFilter = createTemperaTextFilter(pixi, palette, tuning.textInversion);
+        if (textFilter) {
+            textLayer.filters = [textFilter];
+            postProcessFilters.push(textFilter);
         }
         // A bridge shot has no type to reveal, so the camera breath may start immediately -
         // an instrumental gap should not hold a rigid frame.
@@ -557,23 +583,31 @@ export const buildTemperaScene = (
         };
     });
 
+    const baseFilters: import('pixi.js').Filter[] = [];
     if (tuning.postProcessEnabled && !options.staticMode) {
         const sceneFilters = applyTemperaScenePostProcess(pixi, container, tuning, sceneSeed);
         if (sceneFilters.length > 0) {
             // Keep full-scene shaders in viewport space even when visible bounds are smaller.
             container.filterArea = new pixi.Rectangle(0, 0, width, height);
+            baseFilters.push(...sceneFilters);
             postProcessFilters.push(...sceneFilters);
         }
     }
 
     const transitionBlurFilter = tuning.enableTransitions && !options.staticMode
-        ? new pixi.BlurFilter({ strength: 0, quality: 1, kernelSize: 5, resolution: 0.5 })
+        ? new pixi.BlurFilter({
+            strength: 0,
+            quality: 1,
+            kernelSize: 5,
+            resolution: resolveTemperaTransitionBlurResolution(tuning),
+        })
         : null;
     if (transitionBlurFilter) {
         // Pins padding at 0 so ramping blur never rescales the shared vignette pass.
         transitionBlurFilter.repeatEdgePixels = true;
-        transitionBlurFilter.enabled = false;
-        container.filters = [...(container.filters ?? []), transitionBlurFilter];
+        // Left attached-but-disabled it becomes a skipped stack entry that misplaces the
+        // inversion's backdrop copy, so the runtime attaches it per transition instead -
+        // see `temperaSceneFilters.ts`.
         postProcessFilters.push(transitionBlurFilter);
     }
     container.visible = false;
@@ -583,7 +617,9 @@ export const buildTemperaScene = (
         shots,
         palette,
         postProcessFilters,
+        baseFilters,
         transitionBlurFilter,
+        transitionBlurAttached: false,
         activeShotIndex: -1,
     };
 };

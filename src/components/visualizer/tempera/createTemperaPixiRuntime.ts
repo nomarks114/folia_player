@@ -24,6 +24,7 @@ import {
     type TemperaSceneView,
     type TemperaShotView,
 } from './temperaSceneBuilder';
+import { setTemperaTransitionBlur } from './temperaSceneFilters';
 import { resolveTemperaPalette } from './temperaPalette';
 import {
     clamp01,
@@ -128,6 +129,8 @@ const requiresSceneRebuild = (previous: TemperaTuning, next: TemperaTuning) => (
     || previous.textInversion !== next.textInversion
     || previous.enableTransitions !== next.enableTransitions
     || previous.postProcessEnabled !== next.postProcessEnabled
+    // Baked into every filter on the scene at build time, so it cannot be pushed in place.
+    || previous.postProcessTextureCompression !== next.postProcessTextureCompression
     || previous.postProcessGrain !== next.postProcessGrain
     || previous.postProcessContrast !== next.postProcessContrast
     || previous.postProcessRgbShift !== next.postProcessRgbShift
@@ -628,10 +631,9 @@ export class TemperaPixiRuntime {
             );
             scene.container.scale.set(transitionFrame.scale);
             scene.container.rotation = transitionFrame.rotation;
-            if (scene.transitionBlurFilter) {
-                scene.transitionBlurFilter.strength = transitionFrame.blur;
-                scene.transitionBlurFilter.enabled = transitionFrame.blur > 0.01;
-            }
+            // Attached only while it blurs: a parked filter on this container would take
+            // over the lyric inversion's backdrop copy (`temperaSceneFilters.ts`).
+            setTemperaTransitionBlur(scene, transitionFrame.blur);
             if (transitionFrame.wipe > 0.001 && transitionFrame.wipe < 1.999) {
                 this.drawWipe(
                     transitionFrame.wipe,
