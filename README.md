@@ -32,7 +32,7 @@ Lyrics Reimagined // 辞曲新境
 
 Folia是一个以全屏沉浸式歌词播放为核心的在线音乐播放器，支持网易云、酷狗、Navidrome 和本地音乐库，通过智能歌词匹配，AI生成配色主题，以及多种全屏歌词动画为用户提供独特的听歌体验。
 
-提供基于 Electron 的 Windows 桌面端版本与基于 Node.js 的 Web 版本，支持多平台部署。
+提供基于 Electron 的 Windows 桌面端与基于 Node.js 的 Web 版本。Web 版本支持 Vercel、Cloudflare 等多种部署方式。
 
 如果希望能够在移动设备上使用，或在浏览器上体验，可以选择[一键部署到 Vercel](https://folia-site.cielaniska.top/guide/deploy-vercel) 的 Web 版本，或自行部署到其他支持 Node.js 的平台。
 

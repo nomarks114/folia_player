@@ -15,7 +15,7 @@ README 是导航线索，不是代码真相。先按任务读取相关小片段�
 - Partita layout、sticky punctuation、预热和缓存：`src/components/visualizer/partita/README.md`。
 - 在线歌曲 Omni/provider 边界：`src/services/onlineMusic/README.md` + `src/services/onlineMusic/omni.ts`。
 - 同步 API、Node/Cloudflare 部署：`sync-server/README.md`。
-- Linux 便携包和 Electron 图形模式：`electron/main.cjs`。
+- Electron 图形模式与窗口管理：`electron/main.cjs`。
 - Cappella 内置头像/表情资源：相邻 `cappella/avatar/README.md` 或 `emo/README.md`，只在涉及这些资源时读取。
 - `test/manual/**/README.md` 属于测试/联调文档；按“排除测试文件”的任务要求不要把它们当作生产架构依据。
 
