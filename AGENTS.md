@@ -1,6 +1,6 @@
 # Project Skills
 
-本仓库不再把项目规则直接堆在 `AGENTS.md` 中，而是改为按 skill 组织。
+本仓库不再把项目规则直接堆在 `AGENTS.md` 中，而是改为按 skill 组织。1
 
 使用方式：
 
